@@ -1,0 +1,45 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left panel background -->
+  <rect x="8" y="16" width="52" height="96" rx="4" fill="currentColor" opacity="0.15"/>
+  
+  <!-- Left panel border -->
+  <rect x="8" y="16" width="52" height="96" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+  
+  <!-- Left panel folder structure -->
+  <g>
+    <!-- Folder 1 -->
+    <path d="M 18 28 L 28 28 L 30 30 L 50 30 L 50 36 L 18 36 Z" fill="currentColor" opacity="0.6"/>
+    <!-- Lines representing files -->
+    <line x1="22" y1="42" x2="46" y2="42" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+    <line x1="22" y1="48" x2="46" y2="48" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+    <!-- Folder 2 -->
+    <path d="M 18 56" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+    <path d="M 18 60 L 28 60 L 30 62 L 50 62 L 50 68 L 18 68 Z" fill="currentColor" opacity="0.4"/>
+    <!-- Lines in folder -->
+    <line x1="22" y1="74" x2="46" y2="74" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+    <line x1="22" y1="80" x2="46" y2="80" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  </g>
+  
+  <!-- Right panel background -->
+  <rect x="68" y="16" width="52" height="96" rx="4" fill="currentColor" opacity="0.15"/>
+  
+  <!-- Right panel border -->
+  <rect x="68" y="16" width="52" height="96" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+  
+  <!-- Right panel folder structure -->
+  <g>
+    <!-- Folder 1 -->
+    <path d="M 78 28 L 88 28 L 90 30 L 110 30 L 110 36 L 78 36 Z" fill="currentColor" opacity="0.6"/>
+    <!-- Lines representing files -->
+    <line x1="82" y1="42" x2="106" y2="42" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+    <line x1="82" y1="48" x2="106" y2="48" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+    <!-- Folder 2 -->
+    <path d="M 78 60 L 88 60 L 90 62 L 110 62 L 110 68 L 78 68 Z" fill="currentColor" opacity="0.4"/>
+    <!-- Lines in folder -->
+    <line x1="82" y1="74" x2="106" y2="74" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+    <line x1="82" y1="80" x2="106" y2="80" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+  </g>
+  
+  <!-- Vertical separator in the middle -->
+  <line x1="64" y1="20" x2="64" y2="108" stroke="currentColor" stroke-width="2" opacity="0.6"/>
+</svg>

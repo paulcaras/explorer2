@@ -1,0 +1,363 @@
+{
+  "name": "explorer2",
+  "displayName": "Explorer 2",
+  "publisher": "paulcaras",
+  "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
+  "version": "1.0.0",  "license": "MIT",
+  "author": "Paul Caras",
+  "homepage": "https://github.com/paulcaras/explorer2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paulcaras/explorer2"
+  },
+  "bugs": {
+    "url": "https://github.com/paulcaras/explorer2/issues"
+  },
+  "keywords": [
+    "explorer",
+    "file-manager",
+    "file-explorer",
+    "navigation",
+    "dual-view",
+    "split-view"
+  ],  "engines": {
+    "vscode": "^1.108.1"
+  },
+  "categories": [
+    "File Explorers",
+    "Navigation"
+  ],
+  "activationEvents": [
+    "onView:explorer2.topExplorer",
+    "onView:explorer2.bottomExplorer"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "explorer2",
+          "title": "Explorer 2",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "explorer2": [
+        { "id": "explorer2.topExplorer", "name": "Panel I" },
+        { "id": "explorer2.bottomExplorer", "name": "Panel II" }
+      ]
+    },
+    "commands": [
+      {
+        "command": "paulcaras.explorer2.refreshTop",
+        "title": "Refresh Panel I",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "paulcaras.explorer2.refreshBottom",
+        "title": "Refresh Panel II",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "paulcaras.explorer2.newFile",
+        "title": "New File"
+      },
+      {
+        "command": "paulcaras.explorer2.newFolder",
+        "title": "New Folder"
+      },
+      {
+        "command": "paulcaras.explorer2.delete",
+        "title": "Delete"
+      },
+      {
+        "command": "paulcaras.explorer2.rename",
+        "title": "Rename"
+      },
+      {
+        "command": "paulcaras.explorer2.cut",
+        "title": "Cut"
+      },
+      {
+        "command": "paulcaras.explorer2.copy",
+        "title": "Copy"
+      },
+      {
+        "command": "paulcaras.explorer2.paste",
+        "title": "Paste"
+      },
+      {
+        "command": "paulcaras.explorer2.revealToFinder",
+        "title": "Reveal in Finder"
+      },
+      {
+        "command": "paulcaras.explorer2.openInChat",
+        "title": "Open in Chat"
+      },
+      {
+        "command": "paulcaras.explorer2.toggleHiddenFiles",
+        "title": "Toggle Hidden Files",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "paulcaras.explorer2.copyPathAbsolute",
+        "title": "Copy Absolute Path"
+      },
+      {
+        "command": "paulcaras.explorer2.copyPathRelative",
+        "title": "Copy Relative Path"
+      },
+      {
+        "command": "paulcaras.explorer2.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "paulcaras.explorer2.expandAll",
+        "title": "Expand All",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "paulcaras.explorer2.duplicate",
+        "title": "Duplicate"
+      },
+      {
+        "command": "paulcaras.explorer2.openToLeft",
+        "title": "Open to the Left"
+      },
+      {
+        "command": "paulcaras.explorer2.openToRight",
+        "title": "Open to the Right"
+      },
+      {
+        "command": "paulcaras.explorer2.syncWithActiveEditor",
+        "title": "Sync with Active Editor",
+        "icon": "$(link)"
+      },
+      {
+        "command": "paulcaras.explorer2.navigateTopHere",
+        "title": "Navigate Panel I Here"
+      },
+      {
+        "command": "paulcaras.explorer2.navigateBottomHere",
+        "title": "Navigate Panel II Here"
+      },
+      {
+        "command": "paulcaras.explorer2.goToParentTop",
+        "title": "Go to Parent Folder",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "paulcaras.explorer2.goToParentBottom",
+        "title": "Go to Parent Folder",
+        "icon": "$(arrow-up)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "paulcaras.explorer2.refreshTop",
+          "when": "view == explorer2.topExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.collapseAll",
+          "when": "view == explorer2.topExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.expandAll",
+          "when": "view == explorer2.topExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.toggleHiddenFiles",
+          "when": "view == explorer2.topExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.goToParentTop",
+          "when": "view == explorer2.topExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.refreshBottom",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.collapseAll",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.expandAll",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.toggleHiddenFiles",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.goToParentBottom",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.syncWithActiveEditor",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer",
+          "group": "extra"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "paulcaras.explorer2.newFile",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.newFolder",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.navigateTopHere",
+          "when": "view == explorer2.topExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.navigateBottomHere",
+          "when": "view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.cut",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "2_edit"
+        },
+        {
+          "command": "paulcaras.explorer2.copy",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "2_edit"
+        },
+        {
+          "command": "paulcaras.explorer2.paste",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "2_edit"
+        },
+        {
+          "command": "paulcaras.explorer2.duplicate",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "2_edit"
+        },
+        {
+          "command": "paulcaras.explorer2.rename",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "3_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.copyPathAbsolute",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "4_paths"
+        },
+        {
+          "command": "paulcaras.explorer2.copyPathRelative",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "4_paths"
+        },
+        {
+          "command": "paulcaras.explorer2.revealToFinder",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "5_open"
+        },
+        {
+          "command": "paulcaras.explorer2.openInChat",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "group": "5_open"
+        },
+        {
+          "command": "paulcaras.explorer2.openToLeft",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "group": "5_open"
+        },
+        {
+          "command": "paulcaras.explorer2.openToRight",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "group": "5_open"
+        },
+        {
+          "command": "paulcaras.explorer2.delete",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "group": "6_delete"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "paulcaras.explorer2.rename",
+        "key": "F2",
+        "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
+      },
+      {
+        "command": "paulcaras.explorer2.delete",
+        "key": "Delete",
+        "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
+      },
+      {
+        "command": "paulcaras.explorer2.copy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
+      },
+      {
+        "command": "paulcaras.explorer2.cut",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
+      },
+      {
+        "command": "paulcaras.explorer2.paste",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
+      }
+    ]
+  },
+  "configuration": {
+    "title": "Explorer 2",
+    "properties": {
+      "explorer2.showHiddenFiles": {
+        "type": "boolean",
+        "default": false,
+        "description": "Show hidden files and folders (starting with .)"
+      },
+      "explorer2.excludePatterns": {
+        "type": "array",
+        "default": ["node_modules", ".git", "dist", "build"],
+        "description": "Patterns to exclude from the explorer"
+      },
+      "explorer2.sortBy": {
+        "type": "string",
+        "default": "name",
+        "enum": ["name", "type", "modified"],
+        "description": "Sort files by name, type, or last modified date"
+      }
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "eslint": "^9.39.2",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
