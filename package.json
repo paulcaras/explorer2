@@ -3,7 +3,9 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "1.0.0",  "license": "MIT",
+  "version": "1.0.3",
+  "icon": "logo.png",
+  "license": "MIT",
   "author": "Paul Caras",
   "homepage": "https://github.com/paulcaras/explorer2",
   "repository": {
@@ -20,12 +22,12 @@
     "navigation",
     "dual-view",
     "split-view"
-  ],  "engines": {
+  ],
+  "engines": {
     "vscode": "^1.108.1"
   },
   "categories": [
-    "File Explorers",
-    "Navigation"
+    "Other"
   ],
   "activationEvents": [
     "onView:explorer2.topExplorer",
@@ -44,8 +46,14 @@
     },
     "views": {
       "explorer2": [
-        { "id": "explorer2.topExplorer", "name": "Panel I" },
-        { "id": "explorer2.bottomExplorer", "name": "Panel II" }
+        {
+          "id": "explorer2.topExplorer",
+          "name": "Panel I"
+        },
+        {
+          "id": "explorer2.bottomExplorer",
+          "name": "Panel II"
+        }
       ]
     },
     "commands": [
@@ -336,13 +344,22 @@
       },
       "explorer2.excludePatterns": {
         "type": "array",
-        "default": ["node_modules", ".git", "dist", "build"],
+        "default": [
+          "node_modules",
+          ".git",
+          "dist",
+          "build"
+        ],
         "description": "Patterns to exclude from the explorer"
       },
       "explorer2.sortBy": {
         "type": "string",
         "default": "name",
-        "enum": ["name", "type", "modified"],
+        "enum": [
+          "name",
+          "type",
+          "modified"
+        ],
         "description": "Sort files by name, type, or last modified date"
       }
     }
@@ -353,11 +370,11 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "eslint": "^9.39.2",
+    "@types/vscode": "^1.108.1",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.2"
   }
 }

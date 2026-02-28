@@ -2,7 +2,7 @@
 
 Explorer 2 enhances your development workflow by providing **dual independent file explorers** in VS Code's sidebar. Navigate and manage files across different project directories simultaneously—ideal for working with monorepos, separating frontend and backend codebases, or comparing different modules side by side without constantly switching between views.
 
-![Explorer 2 Demo](media/screenshot1.png)
+![Explorer 2 Demo](media/Screenshot1.png)
 
 ## Features
 
@@ -136,7 +136,7 @@ To contribute or modify this extension:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/paulcaras/explorer2
 
 # Install dependencies
 npm install
@@ -159,15 +159,15 @@ npm run lint
 ## Screenshots
 
 ### Dual Independent Explorers
-![Dual Explorers](media/screenshot1.png)
+![Dual Explorers](media/Screenshot1.png)
 *Side-by-side file navigation with independent folder contexts*
 
 ### File Operations
-![File Operations](media/screenshot2.png)
+![File Operations](media/Screenshot2.png)
 *Complete context menu with create, delete, rename, and more*
 
 ### Split Editor Integration
-![Split Editing](media/screenshot3.png)
+![Split Editing](media/Screenshot3.png)
 *Open files to left/right editor panes for side-by-side comparison*
 
 ## Troubleshooting
