@@ -3,7 +3,7 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "icon": "logo.png",
   "license": "MIT",
   "author": "Paul Caras",
@@ -160,6 +160,26 @@
         "command": "paulcaras.explorer2.goToParentBottom",
         "title": "Go to Parent Folder",
         "icon": "$(arrow-up)"
+      },
+      {
+        "command": "paulcaras.explorer2.revealCurrentRootTop",
+        "title": "Reveal Current Folder in Finder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "paulcaras.explorer2.revealCurrentRootBottom",
+        "title": "Reveal Current Folder in Finder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "paulcaras.explorer2.pasteToRootTop",
+        "title": "Paste Here",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "paulcaras.explorer2.pasteToRootBottom",
+        "title": "Paste Here",
+        "icon": "$(clippy)"
       }
     ],
     "menus": {
@@ -190,6 +210,16 @@
           "group": "navigation"
         },
         {
+          "command": "paulcaras.explorer2.revealCurrentRootTop",
+          "when": "view == explorer2.topExplorer",
+          "group": "extra"
+        },
+        {
+          "command": "paulcaras.explorer2.pasteToRootTop",
+          "when": "view == explorer2.topExplorer",
+          "group": "extra"
+        },
+        {
           "command": "paulcaras.explorer2.refreshBottom",
           "when": "view == explorer2.bottomExplorer",
           "group": "navigation"
@@ -213,6 +243,16 @@
           "command": "paulcaras.explorer2.goToParentBottom",
           "when": "view == explorer2.bottomExplorer",
           "group": "navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.revealCurrentRootBottom",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "extra"
+        },
+        {
+          "command": "paulcaras.explorer2.pasteToRootBottom",
+          "when": "view == explorer2.bottomExplorer",
+          "group": "extra"
         },
         {
           "command": "paulcaras.explorer2.syncWithActiveEditor",
@@ -253,7 +293,7 @@
         },
         {
           "command": "paulcaras.explorer2.paste",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
           "group": "2_edit"
         },
         {

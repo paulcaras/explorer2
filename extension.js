@@ -85,6 +85,42 @@ class ClipboardManager {
     this.mode = null; // 'copy' or 'cut'
   }
 
+  async _pathExists(uri) {
+    try {
+      await vscode.workspace.fs.stat(uri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _buildCopyName(originalName, isDirectory, index) {
+    if (isDirectory) {
+      return index === 1
+        ? `${originalName} Copy`
+        : `${originalName} Copy ${index}`;
+    }
+
+    const ext = path.extname(originalName);
+    const base = path.basename(originalName, ext);
+    return index === 1
+      ? `${base} Copy${ext}`
+      : `${base} Copy ${index}${ext}`;
+  }
+
+  async _findAvailableCopyDestination(targetUri, originalName, isDirectory) {
+    for (let index = 1; index < 10000; index += 1) {
+      const candidateName = this._buildCopyName(originalName, isDirectory, index);
+      const candidateUri = vscode.Uri.joinPath(targetUri, candidateName);
+      // First available name wins.
+      if (!(await this._pathExists(candidateUri))) {
+        return candidateUri;
+      }
+    }
+
+    throw new Error("Could not generate a unique destination name");
+  }
+
   async copy(uris) {
     const items = Array.isArray(uris) ? uris : [uris];
     this.clipboard = items;
@@ -116,21 +152,30 @@ class ClipboardManager {
     }
 
     const sourceUris = Array.isArray(this.clipboard) ? this.clipboard : [this.clipboard];
-    const targetPath = targetUri.fsPath;
     const action = this.mode === "cut" ? "Moved" : "Copied";
     let successCount = 0;
     let failureCount = 0;
 
     for (const sourceUri of sourceUris) {
       const fileName = path.basename(sourceUri.fsPath);
-      const destUri = vscode.Uri.file(path.join(targetPath, fileName));
-
-      if (sourceUri.fsPath === destUri.fsPath) {
-        failureCount += 1;
-        continue;
-      }
+      let destUri = vscode.Uri.joinPath(targetUri, fileName);
 
       try {
+        const sourceStat = await vscode.workspace.fs.stat(sourceUri);
+
+        if (this.mode === "copy") {
+          // If copying into same folder or destination exists, generate "Copy" suffix names.
+          const destinationExists = await this._pathExists(destUri);
+          if (sourceUri.fsPath === destUri.fsPath || destinationExists) {
+            destUri = await this._findAvailableCopyDestination(targetUri, fileName, sourceStat.type === vscode.FileType.Directory);
+          }
+        }
+
+        if (this.mode === "cut" && sourceUri.fsPath === destUri.fsPath) {
+          failureCount += 1;
+          continue;
+        }
+
         if (this.mode === "cut") {
           await vscode.workspace.fs.rename(sourceUri, destUri, { overwrite: false });
         } else {
@@ -186,6 +231,9 @@ class ExplorerProvider {
     this.currentRootUri = null; // Track current root for this explorer
     this._refreshTimeout = null; // Debounce timer for file watcher events
     this._otherRefreshTimeout = null; // Debounce timer for related explorer refresh
+    this.expandedPaths = new Set(); // Track expanded folders for the active root
+    this.treeStates = {}; // Persisted tree states keyed by root path
+    this.lastOpenedFilePath = null;
   }
 
   setOtherProvider(other) {
@@ -199,19 +247,30 @@ class ExplorerProvider {
 
   setCurrentRoot(uri) {
     this.currentRootUri = uri;
+    this.loadTreeStateForCurrentRoot();
     this.saveState();
     this.refresh();
   }
 
   saveState() {
-    if (this.stateManager && this.stateKey && this.currentRootUri) {
-      this.stateManager.update(this.stateKey, this.currentRootUri.fsPath);
+    if (this.stateManager && this.stateKey) {
+      const payload = {
+        rootPath: this.currentRootUri?.fsPath || this.rootUri?.fsPath || null,
+        lastOpenedFilePath: this.lastOpenedFilePath || null,
+        treeStates: this.treeStates || {}
+      };
+      this.stateManager.update(this.stateKey, payload);
     }
   }
 
   restoreState() {
     if (this.stateManager && this.stateKey) {
-      const savedPath = this.stateManager.get(this.stateKey);
+      const savedState = this.stateManager.get(this.stateKey);
+      const savedPath = typeof savedState === "string" ? savedState : savedState?.rootPath;
+
+      this.lastOpenedFilePath = typeof savedState === "object" ? savedState?.lastOpenedFilePath || null : null;
+      this.treeStates = typeof savedState === "object" && savedState?.treeStates ? savedState.treeStates : {};
+
       if (savedPath) {
         try {
           this.currentRootUri = vscode.Uri.file(savedPath);
@@ -224,6 +283,62 @@ class ExplorerProvider {
       }
     } else {
       this.currentRootUri = this.rootUri;
+    }
+
+    this.loadTreeStateForCurrentRoot();
+  }
+
+  loadTreeStateForCurrentRoot() {
+    const rootPath = this.currentRootUri?.fsPath;
+    const rootState = rootPath ? this.treeStates[rootPath] : null;
+    const expanded = rootState?.expandedPaths;
+
+    this.expandedPaths = new Set(Array.isArray(expanded) ? expanded : []);
+  }
+
+  saveTreeStateForCurrentRoot() {
+    const rootPath = this.currentRootUri?.fsPath;
+    if (!rootPath) return;
+
+    if (!this.treeStates) {
+      this.treeStates = {};
+    }
+
+    this.treeStates[rootPath] = {
+      expandedPaths: Array.from(this.expandedPaths)
+    };
+  }
+
+  trackExpand(uri) {
+    if (!uri?.fsPath) return;
+    this.expandedPaths.add(uri.fsPath);
+    this.saveTreeStateForCurrentRoot();
+    this.saveState();
+  }
+
+  trackCollapse(uri) {
+    if (!uri?.fsPath) return;
+    this.expandedPaths.delete(uri.fsPath);
+    this.saveTreeStateForCurrentRoot();
+    this.saveState();
+  }
+
+  isPathExpanded(uri) {
+    if (!uri?.fsPath) return false;
+    return this.expandedPaths.has(uri.fsPath);
+  }
+
+  setLastOpenedFile(uri) {
+    this.lastOpenedFilePath = uri?.fsPath || null;
+    this.saveState();
+  }
+
+  getLastOpenedFileUri() {
+    if (!this.lastOpenedFilePath) return null;
+    try {
+      return vscode.Uri.file(this.lastOpenedFilePath);
+    } catch {
+      return null;
     }
   }
 
@@ -322,7 +437,11 @@ class ExplorerProvider {
         .map(([name, fileType]) => {
           const uri = vscode.Uri.joinPath(folderUri, name);
           const isDirectory = fileType === vscode.FileType.Directory;
-          return new FileNode(uri, isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None, isDirectory, name);
+          const collapsibleState = isDirectory
+            ? (this.isPathExpanded(uri) ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
+            : vscode.TreeItemCollapsibleState.None;
+
+          return new FileNode(uri, collapsibleState, isDirectory, name, this.stateKey);
         });
 
       // Sort by name (case-insensitive, folders first)
@@ -344,11 +463,12 @@ class ExplorerProvider {
  * File tree node representing a file or folder
  */
 class FileNode extends vscode.TreeItem {
-  constructor(resourceUri, collapsible, isDirectory, name = null) {
+  constructor(resourceUri, collapsible, isDirectory, name = null, sourcePanel = null) {
     const label = name || path.basename(resourceUri.fsPath);
     super(label, collapsible);
     this.resourceUri = resourceUri;
     this.isDirectory = isDirectory;
+    this.sourcePanel = sourcePanel;
 
     // Set icon
     this.iconPath = getFileIcon(resourceUri.fsPath, isDirectory);
@@ -357,9 +477,9 @@ class FileNode extends vscode.TreeItem {
     this.command =
       collapsible === vscode.TreeItemCollapsibleState.None
         ? {
-            command: "vscode.open",
+            command: "paulcaras.explorer2.openFile",
             title: "Open",
-            arguments: [resourceUri]
+            arguments: [resourceUri, this.sourcePanel]
           }
         : undefined;
 
@@ -469,6 +589,111 @@ function activate(context) {
   // Helper to get all providers
   const providers = [topProvider, bottomProvider];
 
+  const providerByKey = {
+    "explorer2.topExplorerRoot": topProvider,
+    "explorer2.bottomExplorerRoot": bottomProvider
+  };
+
+  const treeByProvider = new Map([
+    [topProvider, topTree],
+    [bottomProvider, bottomTree]
+  ]);
+
+  function getProviderFromNode(node) {
+    if (node?.sourcePanel && providerByKey[node.sourcePanel]) {
+      return providerByKey[node.sourcePanel];
+    }
+
+    const targetPath = node?.resourceUri?.fsPath;
+    if (!targetPath) return null;
+
+    const topHasNode = topTree.selection.some(item => item?.resourceUri?.fsPath === targetPath);
+    if (topHasNode) return topProvider;
+
+    const bottomHasNode = bottomTree.selection.some(item => item?.resourceUri?.fsPath === targetPath);
+    if (bottomHasNode) return bottomProvider;
+
+    return null;
+  }
+
+  async function safeStat(uri) {
+    if (!uri) return null;
+    try {
+      return await vscode.workspace.fs.stat(uri);
+    } catch {
+      return null;
+    }
+  }
+
+  async function restoreProviderTreeState(provider) {
+    const tree = treeByProvider.get(provider);
+    if (!tree || !provider.currentRootUri) return;
+
+    const rootStat = await safeStat(provider.currentRootUri);
+    if (!rootStat || rootStat.type !== vscode.FileType.Directory) {
+      provider.currentRootUri = provider.rootUri;
+      provider.loadTreeStateForCurrentRoot();
+      provider.saveState();
+      provider.refresh();
+      return;
+    }
+
+    provider.refresh();
+
+    // Allow the tree to build before issuing reveal calls.
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const expandedPaths = Array.from(provider.expandedPaths).sort((a, b) => a.length - b.length);
+    for (const expandedPath of expandedPaths) {
+      try {
+        const folderUri = vscode.Uri.file(expandedPath);
+        const stat = await safeStat(folderUri);
+        if (!stat || stat.type !== vscode.FileType.Directory) continue;
+
+        await tree.reveal(new FileNode(folderUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+          expand: true,
+          focus: false,
+          select: false
+        });
+      } catch {
+        // Best effort restoration.
+      }
+    }
+
+    const lastFileUri = provider.getLastOpenedFileUri();
+    if (!lastFileUri) return;
+
+    const lastFileStat = await safeStat(lastFileUri);
+    if (!lastFileStat || lastFileStat.type !== vscode.FileType.File) return;
+
+    // Expand parent directories and reveal the last opened file in the panel.
+    try {
+      const parentPath = path.dirname(lastFileUri.fsPath);
+      if (parentPath.startsWith(provider.currentRootUri.fsPath)) {
+        const relativeDir = path.relative(provider.currentRootUri.fsPath, parentPath);
+        const parts = relativeDir ? relativeDir.split(path.sep).filter(Boolean) : [];
+        let currentUri = provider.currentRootUri;
+
+        for (const part of parts) {
+          currentUri = vscode.Uri.joinPath(currentUri, part);
+          provider.trackExpand(currentUri);
+          await tree.reveal(new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+            expand: true,
+            focus: false,
+            select: false
+          });
+        }
+
+        await tree.reveal(new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
+          focus: false,
+          select: true
+        });
+      }
+    } catch {
+      // Best effort restoration.
+    }
+  }
+
   function sanitizeRelativeInput(value) {
     return value.trim().replace(/\\/g, "/");
   }
@@ -533,6 +758,20 @@ function activate(context) {
     return result;
   }
 
+  function getCurrentSelection() {
+    // Get selection from whichever panel has focus
+    const topSelection = topTree.selection.filter(item => item?.resourceUri);
+    const bottomSelection = bottomTree.selection.filter(item => item?.resourceUri);
+
+    if (topSelection.length > 0) {
+      return topSelection;
+    } else if (bottomSelection.length > 0) {
+      return bottomSelection;
+    }
+
+    return [];
+  }
+
   function resolveActionNodes(node) {
     if (!node?.resourceUri) return [];
 
@@ -593,9 +832,28 @@ function activate(context) {
     }
   });
   context.subscriptions.push(
+    topTree.onDidExpandElement(e => topProvider.trackExpand(e.element.resourceUri)),
+    topTree.onDidCollapseElement(e => topProvider.trackCollapse(e.element.resourceUri)),
+    bottomTree.onDidExpandElement(e => bottomProvider.trackExpand(e.element.resourceUri)),
+    bottomTree.onDidCollapseElement(e => bottomProvider.trackCollapse(e.element.resourceUri)),
+
     configWatcher,
     editorWatcher,
     syncStatusBarItem,
+
+    vscode.commands.registerCommand("paulcaras.explorer2.openFile", async (uri, sourcePanel) => {
+      if (!uri) return;
+      const provider = providerByKey[sourcePanel] || null;
+      if (provider) {
+        provider.setLastOpenedFile(uri);
+      }
+
+      // Keep focus in Explorer2 so its keyboard shortcuts remain active.
+      await vscode.commands.executeCommand("vscode.open", uri, {
+        preserveFocus: true,
+        preview: false
+      });
+    }),
 
     // Refresh commands
     vscode.commands.registerCommand("paulcaras.explorer2.refreshTop", () => topProvider.refresh()),
@@ -622,7 +880,29 @@ function activate(context) {
 
     // New file/folder commands
     vscode.commands.registerCommand("paulcaras.explorer2.newFile", async (node) => {
-      if (!node) return;
+      let targetFolder = null;
+
+      if (node) {
+        targetFolder = node.resourceUri;
+      } else {
+        // No node selected - determine which panel is focused and use its current root
+        const topFocused = topTree.visible;
+        const bottomFocused = bottomTree.visible;
+
+        if (topFocused) {
+          targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+        } else if (bottomFocused) {
+          targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
+        } else {
+          // Fallback to top panel
+          targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+        }
+      }
+
+      if (!targetFolder) {
+        vscode.window.showWarningMessage("Cannot determine target folder");
+        return;
+      }
 
       const filePathInput = await vscode.window.showInputBox({
         prompt: "New file",
@@ -635,10 +915,10 @@ function activate(context) {
       const segments = relativePath.split("/").filter(Boolean);
       const fileName = segments[segments.length - 1];
       const parentSegments = segments.slice(0, -1);
-      let parentUri = node.resourceUri;
+      let parentUri = targetFolder;
 
       if (parentSegments.length) {
-        parentUri = vscode.Uri.joinPath(node.resourceUri, ...parentSegments);
+        parentUri = vscode.Uri.joinPath(targetFolder, ...parentSegments);
         await vscode.workspace.fs.createDirectory(parentUri);
       }
 
@@ -658,7 +938,29 @@ function activate(context) {
     }),
 
     vscode.commands.registerCommand("paulcaras.explorer2.newFolder", async (node) => {
-      if (!node) return;
+      let targetFolder = null;
+
+      if (node) {
+        targetFolder = node.resourceUri;
+      } else {
+        // No node selected - determine which panel is focused and use its current root
+        const topFocused = topTree.visible;
+        const bottomFocused = bottomTree.visible;
+
+        if (topFocused) {
+          targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+        } else if (bottomFocused) {
+          targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
+        } else {
+          // Fallback to top panel
+          targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+        }
+      }
+
+      if (!targetFolder) {
+        vscode.window.showWarningMessage("Cannot determine target folder");
+        return;
+      }
 
       const folderPathInput = await vscode.window.showInputBox({
         prompt: "New folder",
@@ -669,7 +971,7 @@ function activate(context) {
 
       const relativePath = sanitizeRelativeInput(folderPathInput);
       const segments = relativePath.split("/").filter(Boolean);
-      const uri = vscode.Uri.joinPath(node.resourceUri, ...segments);
+      const uri = vscode.Uri.joinPath(targetFolder, ...segments);
 
       try {
         await vscode.workspace.fs.stat(uri);
@@ -686,29 +988,98 @@ function activate(context) {
 
     // Cut command
     vscode.commands.registerCommand("paulcaras.explorer2.cut", async (node) => {
-      if (!node) return;
-      const nodes = resolveActionNodes(node);
-      if (!nodes.length) return;
+      let nodes = [];
+      
+      if (node) {
+        // Called from context menu
+        nodes = resolveActionNodes(node);
+      } else {
+        // Called from keyboard shortcut - get current selection
+        nodes = getCurrentSelection();
+      }
+      
+      if (!nodes.length) {
+        vscode.window.showWarningMessage("No files or folders selected");
+        return;
+      }
+      
       await clipboardManager.cut(nodes.map(item => item.resourceUri));
     }),
 
     // Copy command
     vscode.commands.registerCommand("paulcaras.explorer2.copy", async (node) => {
-      if (!node) return;
-      const nodes = resolveActionNodes(node);
-      if (!nodes.length) return;
+      let nodes = [];
+      
+      if (node) {
+        // Called from context menu
+        nodes = resolveActionNodes(node);
+      } else {
+        // Called from keyboard shortcut - get current selection
+        nodes = getCurrentSelection();
+      }
+      
+      if (!nodes.length) {
+        vscode.window.showWarningMessage("No files or folders selected");
+        return;
+      }
+      
       await clipboardManager.copy(nodes.map(item => item.resourceUri));
     }),
 
     // Paste command
     vscode.commands.registerCommand("paulcaras.explorer2.paste", async (node) => {
-      if (!node) return;
-      const stat = await vscode.workspace.fs.stat(node.resourceUri);
-      if (stat.type === vscode.FileType.Directory) {
-        await clipboardManager.paste(node.resourceUri, providers);
+      let targetFolder = null;
+
+      if (node) {
+        // If a node is provided from context menu, determine the target folder
+        const stat = await vscode.workspace.fs.stat(node.resourceUri);
+        if (stat.type === vscode.FileType.Directory) {
+          // If it's a folder, paste into it
+          targetFolder = node.resourceUri;
+        } else {
+          // If it's a file, paste into its parent directory
+          const parentPath = path.dirname(node.resourceUri.fsPath);
+          targetFolder = vscode.Uri.file(parentPath);
+        }
       } else {
-        vscode.window.showWarningMessage("Can only paste into folders");
+        // Called from keyboard shortcut - get current selection
+        const selection = getCurrentSelection();
+        
+        if (selection.length > 0) {
+          // Use the first selected item
+          const selectedNode = selection[0];
+          const stat = await vscode.workspace.fs.stat(selectedNode.resourceUri);
+          
+          if (stat.type === vscode.FileType.Directory) {
+            // If it's a folder, paste into it
+            targetFolder = selectedNode.resourceUri;
+          } else {
+            // If it's a file, paste into its parent directory (same folder as the file)
+            const parentPath = path.dirname(selectedNode.resourceUri.fsPath);
+            targetFolder = vscode.Uri.file(parentPath);
+          }
+        } else {
+          // No selection - use the current panel's root folder
+          const topFocused = topTree.visible;
+          const bottomFocused = bottomTree.visible;
+
+          if (topFocused) {
+            targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+          } else if (bottomFocused) {
+            targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
+          } else {
+            // Fallback to top panel if neither is clearly focused
+            targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+          }
+        }
       }
+
+      if (!targetFolder) {
+        vscode.window.showWarningMessage("Cannot determine target folder");
+        return;
+      }
+
+      await clipboardManager.paste(targetFolder, providers);
     }),
 
     // Duplicate command
@@ -866,6 +1237,10 @@ function activate(context) {
     // Open in Chat
     vscode.commands.registerCommand("paulcaras.explorer2.openInChat", async (node) => {
       if (!node) return;
+      const provider = getProviderFromNode(node);
+      if (provider && node.resourceUri) {
+        provider.setLastOpenedFile(node.resourceUri);
+      }
       try {
         await vscode.commands.executeCommand("github.copilot.openSymbolFromFile", node.resourceUri);
       } catch {
@@ -881,6 +1256,10 @@ function activate(context) {
     // Open to the Left (in left editor group)
     vscode.commands.registerCommand("paulcaras.explorer2.openToLeft", async (node) => {
       if (!node) return;
+      const provider = getProviderFromNode(node);
+      if (provider && node.resourceUri) {
+        provider.setLastOpenedFile(node.resourceUri);
+      }
       try {
         const doc = await vscode.workspace.openTextDocument(node.resourceUri);
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
@@ -892,6 +1271,10 @@ function activate(context) {
     // Open to the Right (in right editor group)
     vscode.commands.registerCommand("paulcaras.explorer2.openToRight", async (node) => {
       if (!node) return;
+      const provider = getProviderFromNode(node);
+      if (provider && node.resourceUri) {
+        provider.setLastOpenedFile(node.resourceUri);
+      }
       try {
         const doc = await vscode.workspace.openTextDocument(node.resourceUri);
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
@@ -951,12 +1334,59 @@ function activate(context) {
       }
     }),
 
+    // Reveal current root in Finder for Panel I
+    vscode.commands.registerCommand("paulcaras.explorer2.revealCurrentRootTop", async () => {
+      const currentRoot = topProvider.currentRootUri || topProvider.rootUri;
+      if (currentRoot) {
+        try {
+          await vscode.commands.executeCommand("revealFileInOS", currentRoot);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to reveal folder: ${error.message}`);
+        }
+      }
+    }),
+
+    // Reveal current root in Finder for Panel II
+    vscode.commands.registerCommand("paulcaras.explorer2.revealCurrentRootBottom", async () => {
+      const currentRoot = bottomProvider.currentRootUri || bottomProvider.rootUri;
+      if (currentRoot) {
+        try {
+          await vscode.commands.executeCommand("revealFileInOS", currentRoot);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to reveal folder: ${error.message}`);
+        }
+      }
+    }),
+
+    // Paste to current root for Panel I
+    vscode.commands.registerCommand("paulcaras.explorer2.pasteToRootTop", async () => {
+      const targetFolder = topProvider.currentRootUri || topProvider.rootUri;
+      if (targetFolder) {
+        await clipboardManager.paste(targetFolder, providers);
+      }
+    }),
+
+    // Paste to current root for Panel II
+    vscode.commands.registerCommand("paulcaras.explorer2.pasteToRootBottom", async () => {
+      const targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
+      if (targetFolder) {
+        await clipboardManager.paste(targetFolder, providers);
+      }
+    }),
+
     // Cleanup on deactivation
     new vscode.Disposable(() => {
+      topProvider.saveTreeStateForCurrentRoot();
+      bottomProvider.saveTreeStateForCurrentRoot();
+      topProvider.saveState();
+      bottomProvider.saveState();
       topProvider.dispose();
       bottomProvider.dispose();
     })
   );
+
+  void restoreProviderTreeState(topProvider);
+  void restoreProviderTreeState(bottomProvider);
 }
 
 function deactivate() {}
