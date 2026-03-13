@@ -539,11 +539,6 @@ class FileDragAndDropController {
 function activate(context) {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
 
-  if (!workspaceFolder) {
-    vscode.window.showWarningMessage("Explorer 2 requires an open workspace folder");
-    return;
-  }
-
   // Get configuration
   const config = vscode.workspace.getConfiguration("explorer2");
   let showHiddenFiles = config.get("showHiddenFiles", false);
@@ -551,9 +546,9 @@ function activate(context) {
   // Create shared clipboard manager
   const clipboardManager = new ClipboardManager();
 
-  // Create providers with state management
-  const topProvider = new ExplorerProvider(workspaceFolder, clipboardManager, null, showHiddenFiles, context.workspaceState, "explorer2.topExplorerRoot");
-  const bottomProvider = new ExplorerProvider(workspaceFolder, clipboardManager, null, showHiddenFiles, context.workspaceState, "explorer2.bottomExplorerRoot");
+  // Providers can start without a workspace root; empty-state actions let users pick folders.
+  const topProvider = new ExplorerProvider(workspaceFolder || null, clipboardManager, null, showHiddenFiles, context.workspaceState, "explorer2.topExplorerRoot");
+  const bottomProvider = new ExplorerProvider(workspaceFolder || null, clipboardManager, null, showHiddenFiles, context.workspaceState, "explorer2.bottomExplorerRoot");
 
   // Restore saved state
   topProvider.restoreState();
@@ -576,44 +571,69 @@ function activate(context) {
     canSelectMany: true
   });
 
+  if (!workspaceFolder && !topProvider.currentRootUri && !bottomProvider.currentRootUri) {
+    vscode.window.showWarningMessage("Explorer 2 has no workspace folder. Use Open Folder in each panel to start.");
+  }
+
   // Listen for configuration changes
   const configWatcher = vscode.workspace.onDidChangeConfiguration(e => {
     if (e.affectsConfiguration("explorer2.showHiddenFiles")) {
       const newValue = vscode.workspace.getConfiguration("explorer2").get("showHiddenFiles", false);
       showHiddenFiles = newValue;
-      topProvider.setShowHiddenFiles(newValue);
-      bottomProvider.setShowHiddenFiles(newValue);
+      if (topProvider) topProvider.setShowHiddenFiles(newValue);
+      if (bottomProvider) bottomProvider.setShowHiddenFiles(newValue);
     }
   });
 
   // Helper to get all providers
-  const providers = [topProvider, bottomProvider];
+  const providers = () => [topProvider, bottomProvider].filter(Boolean);
 
-  const providerByKey = {
-    "explorer2.topExplorerRoot": topProvider,
-    "explorer2.bottomExplorerRoot": bottomProvider
-  };
-
-  const treeByProvider = new Map([
-    [topProvider, topTree],
-    [bottomProvider, bottomTree]
-  ]);
+  function getProviderByKey(key) {
+    if (key === "explorer2.topExplorerRoot") return topProvider;
+    if (key === "explorer2.bottomExplorerRoot") return bottomProvider;
+    return null;
+  }
 
   function getProviderFromNode(node) {
-    if (node?.sourcePanel && providerByKey[node.sourcePanel]) {
-      return providerByKey[node.sourcePanel];
+    if (node?.sourcePanel) {
+      const p = getProviderByKey(node.sourcePanel);
+      if (p) return p;
     }
 
     const targetPath = node?.resourceUri?.fsPath;
     if (!targetPath) return null;
 
-    const topHasNode = topTree.selection.some(item => item?.resourceUri?.fsPath === targetPath);
-    if (topHasNode) return topProvider;
-
-    const bottomHasNode = bottomTree.selection.some(item => item?.resourceUri?.fsPath === targetPath);
-    if (bottomHasNode) return bottomProvider;
+    if (topTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) return topProvider;
+    if (bottomTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) return bottomProvider;
 
     return null;
+  }
+
+  async function openFolderForPanel(provider, panelLabel) {
+    const selected = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: `Open in ${panelLabel}`
+    });
+
+    const target = selected?.[0];
+    if (!target) return false;
+
+    provider.setCurrentRoot(target);
+    vscode.window.showInformationMessage(`${panelLabel}: ${path.basename(target.fsPath)}`);
+    return true;
+  }
+
+  async function resetPanelToWorkspaceRoot(provider, panelLabel) {
+    const currentWorkspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (currentWorkspaceRoot) {
+      provider.setCurrentRoot(currentWorkspaceRoot);
+      vscode.window.showInformationMessage(`${panelLabel} reset to workspace root`);
+      return;
+    }
+
+    await openFolderForPanel(provider, panelLabel);
   }
 
   async function safeStat(uri) {
@@ -626,7 +646,7 @@ function activate(context) {
   }
 
   async function restoreProviderTreeState(provider) {
-    const tree = treeByProvider.get(provider);
+    const tree = provider === topProvider ? topTree : bottomTree;
     if (!tree || !provider.currentRootUri) return;
 
     const rootStat = await safeStat(provider.currentRootUri);
@@ -759,16 +779,11 @@ function activate(context) {
   }
 
   function getCurrentSelection() {
-    // Get selection from whichever panel has focus
-    const topSelection = topTree.selection.filter(item => item?.resourceUri);
-    const bottomSelection = bottomTree.selection.filter(item => item?.resourceUri);
+    const topSelection = (topTree?.selection ?? []).filter(item => item?.resourceUri);
+    const bottomSelection = (bottomTree?.selection ?? []).filter(item => item?.resourceUri);
 
-    if (topSelection.length > 0) {
-      return topSelection;
-    } else if (bottomSelection.length > 0) {
-      return bottomSelection;
-    }
-
+    if (topSelection.length > 0) return topSelection;
+    if (bottomSelection.length > 0) return bottomSelection;
     return [];
   }
 
@@ -776,8 +791,8 @@ function activate(context) {
     if (!node?.resourceUri) return [];
 
     const targetPath = node.resourceUri.fsPath;
-    const topSelection = topTree.selection.filter(item => item?.resourceUri);
-    const bottomSelection = bottomTree.selection.filter(item => item?.resourceUri);
+    const topSelection = (topTree?.selection ?? []).filter(item => item?.resourceUri);
+    const bottomSelection = (bottomTree?.selection ?? []).filter(item => item?.resourceUri);
 
     const topIncludesNode = topSelection.some(item => item.resourceUri.fsPath === targetPath);
     const bottomIncludesNode = bottomSelection.some(item => item.resourceUri.fsPath === targetPath);
@@ -795,12 +810,13 @@ function activate(context) {
   let syncWithEditorEnabled = false;
   const syncStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   syncStatusBarItem.command = "paulcaras.explorer2.syncWithActiveEditor";
-  updateSyncStatus();
 
   function updateSyncStatus() {
     syncStatusBarItem.text = `$(link) Sync: ${syncWithEditorEnabled ? "On" : "Off"}`;
     syncStatusBarItem.show();
   }
+
+  updateSyncStatus();
 
   // Listen for active editor changes
   const editorWatcher = vscode.window.onDidChangeActiveTextEditor(editor => {
@@ -808,13 +824,13 @@ function activate(context) {
 
     // Auto-reveal the file by expanding parent folders
     const fileUri = editor.document.uri;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const activeWorkspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
     
-    if (!workspaceFolder) return;
+    if (!activeWorkspaceFolder) return;
 
     // Find the relative path and expand folders
-    let currentPath = workspaceFolder;
-    const fileParts = path.relative(workspaceFolder.fsPath, fileUri.fsPath).split(path.sep);
+    let currentPath = activeWorkspaceFolder;
+    const fileParts = path.relative(activeWorkspaceFolder.fsPath, fileUri.fsPath).split(path.sep);
     
     // Remove the filename, keep only folder path
     fileParts.pop();
@@ -831,19 +847,34 @@ function activate(context) {
       // Silent fail
     }
   });
-  context.subscriptions.push(
-    topTree.onDidExpandElement(e => topProvider.trackExpand(e.element.resourceUri)),
-    topTree.onDidCollapseElement(e => topProvider.trackCollapse(e.element.resourceUri)),
-    bottomTree.onDidExpandElement(e => bottomProvider.trackExpand(e.element.resourceUri)),
-    bottomTree.onDidCollapseElement(e => bottomProvider.trackCollapse(e.element.resourceUri)),
 
+  // Register tree-event subscriptions and workspace-required disposables
+  if (topTree && bottomTree) {
+    context.subscriptions.push(
+      topTree.onDidExpandElement(e => topProvider.trackExpand(e.element.resourceUri)),
+      topTree.onDidCollapseElement(e => topProvider.trackCollapse(e.element.resourceUri)),
+      bottomTree.onDidExpandElement(e => bottomProvider.trackExpand(e.element.resourceUri)),
+      bottomTree.onDidCollapseElement(e => bottomProvider.trackCollapse(e.element.resourceUri)),
+      new vscode.Disposable(() => {
+        topProvider.saveTreeStateForCurrentRoot();
+        bottomProvider.saveTreeStateForCurrentRoot();
+        topProvider.saveState();
+        bottomProvider.saveState();
+        topProvider.dispose();
+        bottomProvider.dispose();
+      })
+    );
+  }
+
+  // Always register commands so VS Code can find them regardless of workspace state
+  context.subscriptions.push(
     configWatcher,
     editorWatcher,
     syncStatusBarItem,
 
     vscode.commands.registerCommand("paulcaras.explorer2.openFile", async (uri, sourcePanel) => {
       if (!uri) return;
-      const provider = providerByKey[sourcePanel] || null;
+      const provider = getProviderByKey(sourcePanel);
       if (provider) {
         provider.setLastOpenedFile(uri);
       }
@@ -856,14 +887,29 @@ function activate(context) {
     }),
 
     // Refresh commands
-    vscode.commands.registerCommand("paulcaras.explorer2.refreshTop", () => topProvider.refresh()),
-    vscode.commands.registerCommand("paulcaras.explorer2.refreshBottom", () => bottomProvider.refresh()),
+    vscode.commands.registerCommand("paulcaras.explorer2.refreshTop", () => topProvider?.refresh()),
+    vscode.commands.registerCommand("paulcaras.explorer2.refreshBottom", () => bottomProvider?.refresh()),
+
+    // Empty-state root management
+    vscode.commands.registerCommand("paulcaras.explorer2.openRootTop", async () => {
+      await openFolderForPanel(topProvider, "Panel I");
+    }),
+    vscode.commands.registerCommand("paulcaras.explorer2.openRootBottom", async () => {
+      await openFolderForPanel(bottomProvider, "Panel II");
+    }),
+    vscode.commands.registerCommand("paulcaras.explorer2.resetRootTop", async () => {
+      await resetPanelToWorkspaceRoot(topProvider, "Panel I");
+    }),
+    vscode.commands.registerCommand("paulcaras.explorer2.resetRootBottom", async () => {
+      await resetPanelToWorkspaceRoot(bottomProvider, "Panel II");
+    }),
 
     // Collapse/Expand all
     vscode.commands.registerCommand("paulcaras.explorer2.collapseAll", async (sourceView) => {
+      if (!topProvider) return;
       const provider = sourceView?.treeDataProvider || topProvider;
       const tree = provider === topProvider ? topTree : bottomTree;
-      await tree.reveal(tree.root, { expand: false, focus: false, select: false });
+      await tree?.reveal(tree.root, { expand: false, focus: false, select: false });
     }),
 
     vscode.commands.registerCommand("paulcaras.explorer2.expandAll", async () => {
@@ -880,14 +926,15 @@ function activate(context) {
 
     // New file/folder commands
     vscode.commands.registerCommand("paulcaras.explorer2.newFile", async (node) => {
+      if (!topProvider) return;
       let targetFolder = null;
 
       if (node) {
         targetFolder = node.resourceUri;
       } else {
         // No node selected - determine which panel is focused and use its current root
-        const topFocused = topTree.visible;
-        const bottomFocused = bottomTree.visible;
+        const topFocused = topTree?.visible;
+        const bottomFocused = bottomTree?.visible;
 
         if (topFocused) {
           targetFolder = topProvider.currentRootUri || topProvider.rootUri;
@@ -938,14 +985,15 @@ function activate(context) {
     }),
 
     vscode.commands.registerCommand("paulcaras.explorer2.newFolder", async (node) => {
+      if (!topProvider) return;
       let targetFolder = null;
 
       if (node) {
         targetFolder = node.resourceUri;
       } else {
         // No node selected - determine which panel is focused and use its current root
-        const topFocused = topTree.visible;
-        const bottomFocused = bottomTree.visible;
+        const topFocused = topTree?.visible;
+        const bottomFocused = bottomTree?.visible;
 
         if (topFocused) {
           targetFolder = topProvider.currentRootUri || topProvider.rootUri;
@@ -1028,6 +1076,7 @@ function activate(context) {
 
     // Paste command
     vscode.commands.registerCommand("paulcaras.explorer2.paste", async (node) => {
+      if (!topProvider) return;
       let targetFolder = null;
 
       if (node) {
@@ -1060,8 +1109,8 @@ function activate(context) {
           }
         } else {
           // No selection - use the current panel's root folder
-          const topFocused = topTree.visible;
-          const bottomFocused = bottomTree.visible;
+          const topFocused = topTree?.visible;
+          const bottomFocused = bottomTree?.visible;
 
           if (topFocused) {
             targetFolder = topProvider.currentRootUri || topProvider.rootUri;
@@ -1079,11 +1128,12 @@ function activate(context) {
         return;
       }
 
-      await clipboardManager.paste(targetFolder, providers);
+      await clipboardManager.paste(targetFolder, providers());
     }),
 
     // Duplicate command
     vscode.commands.registerCommand("paulcaras.explorer2.duplicate", async (node) => {
+      if (!topProvider) return;
       if (!node) return;
       const originalName = path.basename(node.resourceUri.fsPath);
       const ext = path.extname(originalName);
@@ -1116,6 +1166,7 @@ function activate(context) {
 
     // Rename command
     vscode.commands.registerCommand("paulcaras.explorer2.rename", async (node) => {
+      if (!topProvider) return;
       if (!node) return;
       const oldName = path.basename(node.resourceUri.fsPath);
       const extension = path.extname(oldName);
@@ -1148,6 +1199,7 @@ function activate(context) {
 
     // Delete command
     vscode.commands.registerCommand("paulcaras.explorer2.delete", async (node) => {
+      if (!topProvider) return;
       if (!node) return;
 
       const nodes = resolveActionNodes(node);
@@ -1292,20 +1344,21 @@ function activate(context) {
 
     // Navigate Panel I to selected folder
     vscode.commands.registerCommand("paulcaras.explorer2.navigateTopHere", async (node) => {
-      if (!node || !node.isDirectory) return;
+      if (!topProvider || !node || !node.isDirectory) return;
       topProvider.setCurrentRoot(node.resourceUri);
       vscode.window.showInformationMessage(`Panel I: ${path.basename(node.resourceUri.fsPath)}`);
     }),
 
     // Navigate Panel II to selected folder
     vscode.commands.registerCommand("paulcaras.explorer2.navigateBottomHere", async (node) => {
-      if (!node || !node.isDirectory) return;
+      if (!bottomProvider || !node || !node.isDirectory) return;
       bottomProvider.setCurrentRoot(node.resourceUri);
       vscode.window.showInformationMessage(`Panel II: ${path.basename(node.resourceUri.fsPath)}`);
     }),
 
     // Go to parent folder in Panel I
     vscode.commands.registerCommand("paulcaras.explorer2.goToParentTop", async () => {
+      if (!topProvider) return;
       const currentRoot = topProvider.currentRootUri || topProvider.rootUri;
       const parentPath = path.dirname(currentRoot.fsPath);
       
@@ -1321,6 +1374,7 @@ function activate(context) {
 
     // Go to parent folder in Panel II
     vscode.commands.registerCommand("paulcaras.explorer2.goToParentBottom", async () => {
+      if (!bottomProvider) return;
       const currentRoot = bottomProvider.currentRootUri || bottomProvider.rootUri;
       const parentPath = path.dirname(currentRoot.fsPath);
       
@@ -1336,6 +1390,7 @@ function activate(context) {
 
     // Reveal current root in Finder for Panel I
     vscode.commands.registerCommand("paulcaras.explorer2.revealCurrentRootTop", async () => {
+      if (!topProvider) return;
       const currentRoot = topProvider.currentRootUri || topProvider.rootUri;
       if (currentRoot) {
         try {
@@ -1348,6 +1403,7 @@ function activate(context) {
 
     // Reveal current root in Finder for Panel II
     vscode.commands.registerCommand("paulcaras.explorer2.revealCurrentRootBottom", async () => {
+      if (!bottomProvider) return;
       const currentRoot = bottomProvider.currentRootUri || bottomProvider.rootUri;
       if (currentRoot) {
         try {
@@ -1360,33 +1416,27 @@ function activate(context) {
 
     // Paste to current root for Panel I
     vscode.commands.registerCommand("paulcaras.explorer2.pasteToRootTop", async () => {
+      if (!topProvider) return;
       const targetFolder = topProvider.currentRootUri || topProvider.rootUri;
       if (targetFolder) {
-        await clipboardManager.paste(targetFolder, providers);
+        await clipboardManager.paste(targetFolder, providers());
       }
     }),
 
     // Paste to current root for Panel II
     vscode.commands.registerCommand("paulcaras.explorer2.pasteToRootBottom", async () => {
+      if (!bottomProvider) return;
       const targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
       if (targetFolder) {
-        await clipboardManager.paste(targetFolder, providers);
+        await clipboardManager.paste(targetFolder, providers());
       }
-    }),
-
-    // Cleanup on deactivation
-    new vscode.Disposable(() => {
-      topProvider.saveTreeStateForCurrentRoot();
-      bottomProvider.saveTreeStateForCurrentRoot();
-      topProvider.saveState();
-      bottomProvider.saveState();
-      topProvider.dispose();
-      bottomProvider.dispose();
     })
   );
 
-  void restoreProviderTreeState(topProvider);
-  void restoreProviderTreeState(bottomProvider);
+  if (topProvider && bottomProvider) {
+    void restoreProviderTreeState(topProvider);
+    void restoreProviderTreeState(bottomProvider);
+  }
 }
 
 function deactivate() {}

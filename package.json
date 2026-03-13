@@ -29,10 +29,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:explorer2.topExplorer",
-    "onView:explorer2.bottomExplorer"
-  ],
   "main": "./extension.js",
   "contributes": {
     "viewsContainers": {
@@ -56,6 +52,16 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "explorer2.topExplorer",
+        "contents": "No folder loaded or folder is unavailable in Panel I.\n[Open Folder](command:paulcaras.explorer2.openRootTop)\n[Reset to Workspace Root](command:paulcaras.explorer2.resetRootTop)"
+      },
+      {
+        "view": "explorer2.bottomExplorer",
+        "contents": "No folder loaded or folder is unavailable in Panel II.\n[Open Folder](command:paulcaras.explorer2.openRootBottom)\n[Reset to Workspace Root](command:paulcaras.explorer2.resetRootBottom)"
+      }
+    ],
     "commands": [
       {
         "command": "paulcaras.explorer2.refreshTop",
@@ -66,6 +72,26 @@
         "command": "paulcaras.explorer2.refreshBottom",
         "title": "Refresh Panel II",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "paulcaras.explorer2.openRootTop",
+        "title": "Open Folder in Panel I",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "paulcaras.explorer2.openRootBottom",
+        "title": "Open Folder in Panel II",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "paulcaras.explorer2.resetRootTop",
+        "title": "Reset Panel I to Workspace Root",
+        "icon": "$(home)"
+      },
+      {
+        "command": "paulcaras.explorer2.resetRootBottom",
+        "title": "Reset Panel II to Workspace Root",
+        "icon": "$(home)"
       },
       {
         "command": "paulcaras.explorer2.newFile",
