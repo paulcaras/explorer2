@@ -587,15 +587,37 @@ function activate(context) {
 
   // Helper to get all providers
   const providers = () => [topProvider, bottomProvider].filter(Boolean);
+  const TOP_PANEL_KEY = "explorer2.topExplorerRoot";
+  const BOTTOM_PANEL_KEY = "explorer2.bottomExplorerRoot";
+  let activePanelKey = TOP_PANEL_KEY;
 
   function getProviderByKey(key) {
-    if (key === "explorer2.topExplorerRoot") return topProvider;
-    if (key === "explorer2.bottomExplorerRoot") return bottomProvider;
+    if (key === TOP_PANEL_KEY) return topProvider;
+    if (key === BOTTOM_PANEL_KEY) return bottomProvider;
     return null;
+  }
+
+  function getSelectionForPanel(panelKey) {
+    if (panelKey === TOP_PANEL_KEY) {
+      return (topTree?.selection ?? []).filter(item => item?.resourceUri);
+    }
+
+    if (panelKey === BOTTOM_PANEL_KEY) {
+      return (bottomTree?.selection ?? []).filter(item => item?.resourceUri);
+    }
+
+    return [];
+  }
+
+  function setActivePanel(panelKey) {
+    if (panelKey === TOP_PANEL_KEY || panelKey === BOTTOM_PANEL_KEY) {
+      activePanelKey = panelKey;
+    }
   }
 
   function getProviderFromNode(node) {
     if (node?.sourcePanel) {
+      setActivePanel(node.sourcePanel);
       const p = getProviderByKey(node.sourcePanel);
       if (p) return p;
     }
@@ -603,8 +625,15 @@ function activate(context) {
     const targetPath = node?.resourceUri?.fsPath;
     if (!targetPath) return null;
 
-    if (topTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) return topProvider;
-    if (bottomTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) return bottomProvider;
+    if (topTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) {
+      setActivePanel(TOP_PANEL_KEY);
+      return topProvider;
+    }
+
+    if (bottomTree?.selection.some(item => item?.resourceUri?.fsPath === targetPath)) {
+      setActivePanel(BOTTOM_PANEL_KEY);
+      return bottomProvider;
+    }
 
     return null;
   }
@@ -779,20 +808,26 @@ function activate(context) {
   }
 
   function getCurrentSelection() {
-    const topSelection = (topTree?.selection ?? []).filter(item => item?.resourceUri);
-    const bottomSelection = (bottomTree?.selection ?? []).filter(item => item?.resourceUri);
+    const activeSelection = getSelectionForPanel(activePanelKey);
+    if (activeSelection.length > 0) return activeSelection;
 
-    if (topSelection.length > 0) return topSelection;
-    if (bottomSelection.length > 0) return bottomSelection;
+    const otherPanelKey = activePanelKey === TOP_PANEL_KEY ? BOTTOM_PANEL_KEY : TOP_PANEL_KEY;
+    const fallbackSelection = getSelectionForPanel(otherPanelKey);
+    if (fallbackSelection.length > 0) return fallbackSelection;
+
     return [];
   }
 
   function resolveActionNodes(node) {
     if (!node?.resourceUri) return [];
 
+    if (node.sourcePanel) {
+      setActivePanel(node.sourcePanel);
+    }
+
     const targetPath = node.resourceUri.fsPath;
-    const topSelection = (topTree?.selection ?? []).filter(item => item?.resourceUri);
-    const bottomSelection = (bottomTree?.selection ?? []).filter(item => item?.resourceUri);
+    const topSelection = getSelectionForPanel(TOP_PANEL_KEY);
+    const bottomSelection = getSelectionForPanel(BOTTOM_PANEL_KEY);
 
     const topIncludesNode = topSelection.some(item => item.resourceUri.fsPath === targetPath);
     const bottomIncludesNode = bottomSelection.some(item => item.resourceUri.fsPath === targetPath);
@@ -851,6 +886,8 @@ function activate(context) {
   // Register tree-event subscriptions and workspace-required disposables
   if (topTree && bottomTree) {
     context.subscriptions.push(
+      topTree.onDidChangeSelection(() => setActivePanel(TOP_PANEL_KEY)),
+      bottomTree.onDidChangeSelection(() => setActivePanel(BOTTOM_PANEL_KEY)),
       topTree.onDidExpandElement(e => topProvider.trackExpand(e.element.resourceUri)),
       topTree.onDidCollapseElement(e => topProvider.trackCollapse(e.element.resourceUri)),
       bottomTree.onDidExpandElement(e => bottomProvider.trackExpand(e.element.resourceUri)),
@@ -1092,7 +1129,7 @@ function activate(context) {
         }
       } else {
         // Called from keyboard shortcut - get current selection
-        const selection = getCurrentSelection();
+        const selection = getSelectionForPanel(activePanelKey);
         
         if (selection.length > 0) {
           // Use the first selected item
@@ -1108,18 +1145,9 @@ function activate(context) {
             targetFolder = vscode.Uri.file(parentPath);
           }
         } else {
-          // No selection - use the current panel's root folder
-          const topFocused = topTree?.visible;
-          const bottomFocused = bottomTree?.visible;
-
-          if (topFocused) {
-            targetFolder = topProvider.currentRootUri || topProvider.rootUri;
-          } else if (bottomFocused) {
-            targetFolder = bottomProvider.currentRootUri || bottomProvider.rootUri;
-          } else {
-            // Fallback to top panel if neither is clearly focused
-            targetFolder = topProvider.currentRootUri || topProvider.rootUri;
-          }
+          // No selection - use the active panel's root folder
+          const activeProvider = getProviderByKey(activePanelKey) || topProvider;
+          targetFolder = activeProvider.currentRootUri || activeProvider.rootUri;
         }
       }
 
