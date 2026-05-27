@@ -13,6 +13,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Persistent tree state tracking for each panel root: expanded folders and last opened file
 - Empty-state welcome actions for both panels: `Open Folder` and `Reset to Workspace Root`
 - New panel root management commands: `openRootTop`, `openRootBottom`, `resetRootTop`, and `resetRootBottom`
+- Added Panel Root Folder
 
 ### Changed
 - Copy, cut, and paste commands now work from keyboard shortcuts and context menus using current Explorer 2 selection
@@ -27,6 +28,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Fixed shortcut flow where opening a file from Explorer 2 moved focus away and prevented Explorer 2 keybindings from triggering
 - Fixed command availability issues on VS Code 1.111.0 where contributed commands could show as not found in some activation paths
 - Fixed panel recovery flow when a saved panel root becomes unavailable by providing direct open/reset actions
+- Fixed panel-wise Toggle Hidden Files
 
 ## [1.0.0] - 2026-02-28
 

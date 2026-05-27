@@ -3,7 +3,7 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "icon": "logo.png",
   "license": "MIT",
   "author": "Paul Caras",
@@ -130,8 +130,13 @@
         "title": "Open in Chat"
       },
       {
-        "command": "paulcaras.explorer2.toggleHiddenFiles",
-        "title": "Toggle Hidden Files",
+        "command": "paulcaras.explorer2.toggleHiddenFilesTop",
+        "title": "Toggle Hidden Files in Panel I",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "paulcaras.explorer2.toggleHiddenFilesBottom",
+        "title": "Toggle Hidden Files in Panel II",
         "icon": "$(eye)"
       },
       {
@@ -176,6 +181,14 @@
       {
         "command": "paulcaras.explorer2.navigateBottomHere",
         "title": "Navigate Panel II Here"
+      },
+      {
+        "command": "paulcaras.explorer2.setRootTopHere",
+        "title": "Set Panel I Root Here"
+      },
+      {
+        "command": "paulcaras.explorer2.setRootBottomHere",
+        "title": "Set Panel II Root Here"
       },
       {
         "command": "paulcaras.explorer2.goToParentTop",
@@ -226,7 +239,7 @@
           "group": "navigation"
         },
         {
-          "command": "paulcaras.explorer2.toggleHiddenFiles",
+          "command": "paulcaras.explorer2.toggleHiddenFilesTop",
           "when": "view == explorer2.topExplorer",
           "group": "navigation"
         },
@@ -261,7 +274,7 @@
           "group": "navigation"
         },
         {
-          "command": "paulcaras.explorer2.toggleHiddenFiles",
+          "command": "paulcaras.explorer2.toggleHiddenFilesBottom",
           "when": "view == explorer2.bottomExplorer",
           "group": "navigation"
         },
@@ -289,12 +302,12 @@
       "view/item/context": [
         {
           "command": "paulcaras.explorer2.newFile",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && viewItem == folderNode",
           "group": "1_navigation"
         },
         {
           "command": "paulcaras.explorer2.newFolder",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && viewItem == folderNode",
           "group": "1_navigation"
         },
         {
@@ -308,63 +321,73 @@
           "group": "1_navigation"
         },
         {
+          "command": "paulcaras.explorer2.setRootTopHere",
+          "when": "view == explorer2.topExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.setRootBottomHere",
+          "when": "view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "1_navigation"
+        },
+        {
           "command": "paulcaras.explorer2.cut",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "2_edit"
         },
         {
           "command": "paulcaras.explorer2.copy",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "2_edit"
         },
         {
           "command": "paulcaras.explorer2.paste",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "2_edit"
         },
         {
           "command": "paulcaras.explorer2.duplicate",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "2_edit"
         },
         {
           "command": "paulcaras.explorer2.rename",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "3_navigation"
         },
         {
           "command": "paulcaras.explorer2.copyPathAbsolute",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "4_paths"
         },
         {
           "command": "paulcaras.explorer2.copyPathRelative",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "4_paths"
         },
         {
           "command": "paulcaras.explorer2.revealToFinder",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "5_open"
         },
         {
           "command": "paulcaras.explorer2.openInChat",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && viewItem == fileNode",
           "group": "5_open"
         },
         {
           "command": "paulcaras.explorer2.openToLeft",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && viewItem == fileNode",
           "group": "5_open"
         },
         {
           "command": "paulcaras.explorer2.openToRight",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && viewItem == fileNode",
           "group": "5_open"
         },
         {
           "command": "paulcaras.explorer2.delete",
-          "when": "view == explorer2.topExplorer || view == explorer2.bottomExplorer && viewItem == fileNode || viewItem == folderNode",
+          "when": "(view == explorer2.topExplorer || view == explorer2.bottomExplorer) && (viewItem == fileNode || viewItem == folderNode)",
           "group": "6_delete"
         }
       ]
@@ -398,35 +421,35 @@
         "mac": "cmd+v",
         "when": "focusedView == explorer2.topExplorer || focusedView == explorer2.bottomExplorer"
       }
-    ]
-  },
-  "configuration": {
-    "title": "Explorer 2",
-    "properties": {
-      "explorer2.showHiddenFiles": {
-        "type": "boolean",
-        "default": false,
-        "description": "Show hidden files and folders (starting with .)"
-      },
-      "explorer2.excludePatterns": {
-        "type": "array",
-        "default": [
-          "node_modules",
-          ".git",
-          "dist",
-          "build"
-        ],
-        "description": "Patterns to exclude from the explorer"
-      },
-      "explorer2.sortBy": {
-        "type": "string",
-        "default": "name",
-        "enum": [
-          "name",
-          "type",
-          "modified"
-        ],
-        "description": "Sort files by name, type, or last modified date"
+    ],
+    "configuration": {
+      "title": "Explorer 2",
+      "properties": {
+        "explorer2.showHiddenFiles": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show hidden files and folders (starting with .)"
+        },
+        "explorer2.excludePatterns": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "build"
+          ],
+          "description": "Patterns to exclude from the explorer"
+        },
+        "explorer2.sortBy": {
+          "type": "string",
+          "default": "name",
+          "enum": [
+            "name",
+            "type",
+            "modified"
+          ],
+          "description": "Sort files by name, type, or last modified date"
+        }
       }
     }
   },

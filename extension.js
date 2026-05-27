@@ -242,6 +242,7 @@ class ExplorerProvider {
 
   setShowHiddenFiles(show) {
     this.showHiddenFiles = show;
+    this.saveState();
     this.refresh();
   }
 
@@ -257,7 +258,8 @@ class ExplorerProvider {
       const payload = {
         rootPath: this.currentRootUri?.fsPath || this.rootUri?.fsPath || null,
         lastOpenedFilePath: this.lastOpenedFilePath || null,
-        treeStates: this.treeStates || {}
+        treeStates: this.treeStates || {},
+        showHiddenFiles: this.showHiddenFiles
       };
       this.stateManager.update(this.stateKey, payload);
     }
@@ -270,6 +272,9 @@ class ExplorerProvider {
 
       this.lastOpenedFilePath = typeof savedState === "object" ? savedState?.lastOpenedFilePath || null : null;
       this.treeStates = typeof savedState === "object" && savedState?.treeStates ? savedState.treeStates : {};
+      this.showHiddenFiles = typeof savedState === "object" && typeof savedState?.showHiddenFiles === "boolean"
+        ? savedState.showHiddenFiles
+        : this.showHiddenFiles;
 
       if (savedPath) {
         try {
@@ -571,6 +576,31 @@ function activate(context) {
     canSelectMany: true
   });
 
+  function getPanelTitle(baseTitle, provider) {
+    const currentRoot = provider.currentRootUri;
+    if (!currentRoot) {
+      return baseTitle;
+    }
+
+    const defaultRoot = provider.rootUri?.fsPath;
+    if (defaultRoot && currentRoot.fsPath === defaultRoot) {
+      return baseTitle;
+    }
+
+    return `${baseTitle}: ${path.basename(currentRoot.fsPath)}/`;
+  }
+
+  function updateTreeViewTitles() {
+    if (topTree) {
+      topTree.title = getPanelTitle("Panel I", topProvider);
+    }
+    if (bottomTree) {
+      bottomTree.title = getPanelTitle("Panel II", bottomProvider);
+    }
+  }
+
+  updateTreeViewTitles();
+
   if (!workspaceFolder && !topProvider.currentRootUri && !bottomProvider.currentRootUri) {
     vscode.window.showWarningMessage("Explorer 2 has no workspace folder. Use Open Folder in each panel to start.");
   }
@@ -638,6 +668,12 @@ function activate(context) {
     return null;
   }
 
+  async function setPanelRoot(provider, rootUri) {
+    if (!provider || !rootUri) return;
+    provider.setCurrentRoot(rootUri);
+    updateTreeViewTitles();
+  }
+
   async function openFolderForPanel(provider, panelLabel) {
     const selected = await vscode.window.showOpenDialog({
       canSelectFiles: false,
@@ -649,7 +685,7 @@ function activate(context) {
     const target = selected?.[0];
     if (!target) return false;
 
-    provider.setCurrentRoot(target);
+    await setPanelRoot(provider, target);
     vscode.window.showInformationMessage(`${panelLabel}: ${path.basename(target.fsPath)}`);
     return true;
   }
@@ -657,7 +693,7 @@ function activate(context) {
   async function resetPanelToWorkspaceRoot(provider, panelLabel) {
     const currentWorkspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
     if (currentWorkspaceRoot) {
-      provider.setCurrentRoot(currentWorkspaceRoot);
+      await setPanelRoot(provider, currentWorkspaceRoot);
       vscode.window.showInformationMessage(`${panelLabel} reset to workspace root`);
       return;
     }
@@ -954,11 +990,20 @@ function activate(context) {
       vscode.window.showInformationMessage("Use arrow keys or double-click to expand folders");
     }),
 
-    // Toggle hidden files
-    vscode.commands.registerCommand("paulcaras.explorer2.toggleHiddenFiles", () => {
-      showHiddenFiles = !showHiddenFiles;
-      vscode.workspace.getConfiguration("explorer2").update("showHiddenFiles", showHiddenFiles, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage(`Hidden files ${showHiddenFiles ? "shown" : "hidden"}`);
+    // Toggle hidden files in Panel I
+    vscode.commands.registerCommand("paulcaras.explorer2.toggleHiddenFilesTop", async () => {
+      if (!topProvider) return;
+      const nextValue = !topProvider.showHiddenFiles;
+      topProvider.setShowHiddenFiles(nextValue);
+      vscode.window.showInformationMessage(`Panel I hidden files ${nextValue ? "shown" : "hidden"}`);
+    }),
+
+    // Toggle hidden files in Panel II
+    vscode.commands.registerCommand("paulcaras.explorer2.toggleHiddenFilesBottom", async () => {
+      if (!bottomProvider) return;
+      const nextValue = !bottomProvider.showHiddenFiles;
+      bottomProvider.setShowHiddenFiles(nextValue);
+      vscode.window.showInformationMessage(`Panel II hidden files ${nextValue ? "shown" : "hidden"}`);
     }),
 
     // New file/folder commands
@@ -1373,15 +1418,29 @@ function activate(context) {
     // Navigate Panel I to selected folder
     vscode.commands.registerCommand("paulcaras.explorer2.navigateTopHere", async (node) => {
       if (!topProvider || !node || !node.isDirectory) return;
-      topProvider.setCurrentRoot(node.resourceUri);
+      await setPanelRoot(topProvider, node.resourceUri);
       vscode.window.showInformationMessage(`Panel I: ${path.basename(node.resourceUri.fsPath)}`);
     }),
 
     // Navigate Panel II to selected folder
     vscode.commands.registerCommand("paulcaras.explorer2.navigateBottomHere", async (node) => {
       if (!bottomProvider || !node || !node.isDirectory) return;
-      bottomProvider.setCurrentRoot(node.resourceUri);
+      await setPanelRoot(bottomProvider, node.resourceUri);
       vscode.window.showInformationMessage(`Panel II: ${path.basename(node.resourceUri.fsPath)}`);
+    }),
+
+    // Set Panel I root to the selected folder
+    vscode.commands.registerCommand("paulcaras.explorer2.setRootTopHere", async (node) => {
+      if (!topProvider || !node || !node.isDirectory) return;
+      await setPanelRoot(topProvider, node.resourceUri);
+      vscode.window.showInformationMessage(`Panel I root set to: ${path.basename(node.resourceUri.fsPath)}`);
+    }),
+
+    // Set Panel II root to the selected folder
+    vscode.commands.registerCommand("paulcaras.explorer2.setRootBottomHere", async (node) => {
+      if (!bottomProvider || !node || !node.isDirectory) return;
+      await setPanelRoot(bottomProvider, node.resourceUri);
+      vscode.window.showInformationMessage(`Panel II root set to: ${path.basename(node.resourceUri.fsPath)}`);
     }),
 
     // Go to parent folder in Panel I
@@ -1464,6 +1523,7 @@ function activate(context) {
   if (topProvider && bottomProvider) {
     void restoreProviderTreeState(topProvider);
     void restoreProviderTreeState(bottomProvider);
+    updateTreeViewTitles();
   }
 }
 
