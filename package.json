@@ -176,11 +176,13 @@
       },
       {
         "command": "paulcaras.explorer2.navigateTopHere",
-        "title": "Navigate Panel I Here"
+        "title": "Navigate Panel I Here",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "paulcaras.explorer2.navigateBottomHere",
-        "title": "Navigate Panel II Here"
+        "title": "Navigate Panel II Here",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "paulcaras.explorer2.setRootTopHere",
@@ -316,9 +318,19 @@
           "group": "1_navigation"
         },
         {
+          "command": "paulcaras.explorer2.navigateTopHere",
+          "when": "view == explorer2.topExplorer && viewItem == folderNode",
+          "group": "inline"
+        },
+        {
           "command": "paulcaras.explorer2.navigateBottomHere",
           "when": "view == explorer2.bottomExplorer && viewItem == folderNode",
           "group": "1_navigation"
+        },
+        {
+          "command": "paulcaras.explorer2.navigateBottomHere",
+          "when": "view == explorer2.bottomExplorer && viewItem == folderNode",
+          "group": "inline"
         },
         {
           "command": "paulcaras.explorer2.setRootTopHere",
