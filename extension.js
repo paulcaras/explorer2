@@ -2,78 +2,11 @@ const vscode = require("vscode");
 const path = require("path");
 
 /**
- * Utility to get file icon based on extension
+ * Utility to get file/folder icon from the active VS Code file icon theme
  */
 function getFileIcon(filePath, isDirectory) {
-  if (isDirectory) {
-    return new vscode.ThemeIcon("folder");
-  }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const nameOnly = path.basename(filePath).toLowerCase();
-
-  // Map extensions to VS Code icons
-  const iconMap = {
-    // Images
-    ".png": "file-media",
-    ".jpg": "file-media",
-    ".jpeg": "file-media",
-    ".gif": "file-media",
-    ".svg": "file-media",
-    ".ico": "file-media",
-    ".webp": "file-media",
-    // Code
-    ".js": "file-code",
-    ".ts": "file-code",
-    ".tsx": "file-code",
-    ".jsx": "file-code",
-    ".py": "file-code",
-    ".java": "file-code",
-    ".cpp": "file-code",
-    ".c": "file-code",
-    ".go": "file-code",
-    ".rs": "file-code",
-    ".php": "file-code",
-    ".rb": "file-code",
-    ".swift": "file-code",
-    ".kt": "file-code",
-    // Markup
-    ".html": "file-code",
-    ".htm": "file-code",
-    ".xml": "file-code",
-    ".json": "file-code",
-    ".yaml": "file-code",
-    ".yml": "file-code",
-    ".toml": "file-code",
-    ".css": "file-code",
-    ".scss": "file-code",
-    ".less": "file-code",
-    // Docs
-    ".md": "file-text",
-    ".txt": "file-text",
-    ".pdf": "file-pdf",
-    ".doc": "file-word",
-    ".docx": "file-word",
-    // Data
-    ".csv": "file-binary",
-    ".sql": "file-code",
-    // Config
-    ".env": "file-settings",
-    ".config": "file-settings",
-    // Archives
-    ".zip": "file-zip",
-    ".tar": "file-zip",
-    ".gz": "file-zip",
-    ".rar": "file-zip",
-  };
-
-  // Special cases by filename
-  if (nameOnly === ".gitignore") return new vscode.ThemeIcon("file-add");
-  if (nameOnly === ".env") return new vscode.ThemeIcon("file-settings");
-  if (nameOnly === "package.json") return new vscode.ThemeIcon("file-code");
-  if (nameOnly === "dockerfile") return new vscode.ThemeIcon("file-code");
-
-  return new vscode.ThemeIcon(iconMap[ext] || "file");
+  void filePath;
+  return isDirectory ? vscode.ThemeIcon.Folder : vscode.ThemeIcon.File;
 }
 
 /**
