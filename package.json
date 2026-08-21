@@ -3,7 +3,7 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "logo.png",
   "license": "MIT",
   "author": "Paul Caras",
@@ -171,7 +171,7 @@
       },
       {
         "command": "paulcaras.explorer2.syncWithActiveEditor",
-        "title": "Sync with Active Editor",
+        "title": "Toggle Active File Jump",
         "icon": "$(link)"
       },
       {

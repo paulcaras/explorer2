@@ -416,6 +416,26 @@ class ExplorerProvider {
     return element;
   }
 
+  async getParent(element) {
+    if (!element?.resourceUri) return null;
+
+    const rootUri = this.currentRootUri || this.rootUri;
+    if (!rootUri) return null;
+
+    if (element.resourceUri.fsPath === rootUri.fsPath) {
+      return null;
+    }
+
+    const parentPath = path.dirname(element.resourceUri.fsPath);
+    if (!parentPath || parentPath === element.resourceUri.fsPath) return null;
+
+    if (parentPath !== rootUri.fsPath && !parentPath.startsWith(`${rootUri.fsPath}${path.sep}`)) {
+      return null;
+    }
+
+    return new FileNode(vscode.Uri.file(parentPath), vscode.TreeItemCollapsibleState.Collapsed, true, path.basename(parentPath), this.stateKey);
+  }
+
   async getChildren(element) {
     const folderUri = element ? element.resourceUri : (this.currentRootUri || this.rootUri);
     if (!folderUri) return [];
@@ -472,6 +492,7 @@ class FileNode extends vscode.TreeItem {
     const label = name || path.basename(resourceUri.fsPath);
     super(label, collapsible);
     this.resourceUri = resourceUri;
+    this.id = resourceUri.fsPath;
     this.isDirectory = isDirectory;
     this.sourcePanel = sourcePanel;
 
@@ -617,6 +638,15 @@ function activate(context) {
 
   // Helper to get all providers
   const providers = () => [topProvider, bottomProvider].filter(Boolean);
+  const ACTIVE_FILE_JUMP_KEY = "explorer2.activeFileJumpEnabled";
+  let activeFileJumpEnabled = context.workspaceState.get(ACTIVE_FILE_JUMP_KEY, false);
+
+  function setActiveFileJumpEnabled(enabled) {
+    activeFileJumpEnabled = enabled;
+    context.workspaceState.update(ACTIVE_FILE_JUMP_KEY, enabled);
+    updateSyncStatus();
+  }
+
   const TOP_PANEL_KEY = "explorer2.topExplorerRoot";
   const BOTTOM_PANEL_KEY = "explorer2.bottomExplorerRoot";
   let activePanelKey = TOP_PANEL_KEY;
@@ -725,8 +755,8 @@ function activate(context) {
 
     provider.refresh();
 
-    // Allow the tree to build before issuing reveal calls.
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Wait for the initial tree layout before restoring expansion and scroll position.
+    await delay(150);
 
     const expandedPaths = Array.from(provider.expandedPaths).sort((a, b) => a.length - b.length);
     for (const expandedPath of expandedPaths) {
@@ -735,11 +765,11 @@ function activate(context) {
         const stat = await safeStat(folderUri);
         if (!stat || stat.type !== vscode.FileType.Directory) continue;
 
-        await tree.reveal(new FileNode(folderUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+        await revealTreeItem(tree, new FileNode(folderUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
           expand: true,
           focus: false,
           select: false
-        });
+        }, 5);
       } catch {
         // Best effort restoration.
       }
@@ -762,17 +792,18 @@ function activate(context) {
         for (const part of parts) {
           currentUri = vscode.Uri.joinPath(currentUri, part);
           provider.trackExpand(currentUri);
-          await tree.reveal(new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+          await revealTreeItem(tree, new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
             expand: true,
             focus: false,
             select: false
-          });
+          }, 5);
         }
 
-        await tree.reveal(new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
+        // Selecting the saved item makes VS Code scroll the panel to its previous location.
+        await revealTreeItem(tree, new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
           focus: false,
           select: true
-        });
+        }, 5);
       }
     } catch {
       // Best effort restoration.
@@ -877,45 +908,152 @@ function activate(context) {
     return filterNestedSelections(selectedNodes);
   }
 
-  // Sync with active editor state
-  let syncWithEditorEnabled = false;
+  function isPathUnderRoot(fileUri, rootUri) {
+    if (!fileUri || !rootUri) return false;
+    const filePath = fileUri.fsPath;
+    const rootPath = rootUri.fsPath;
+    if (filePath === rootPath) return true;
+    return filePath.startsWith(rootPath.endsWith(path.sep) ? rootPath : `${rootPath}${path.sep}`);
+  }
+
+  function chooseProviderForFile(fileUri) {
+    const providerCandidates = [];
+    const providersToCheck = [
+      { provider: topProvider, tree: topTree },
+      { provider: bottomProvider, tree: bottomTree }
+    ];
+
+    for (const item of providersToCheck) {
+      const providerRoot = item.provider?.currentRootUri || item.provider?.rootUri;
+      if (providerRoot && isPathUnderRoot(fileUri, providerRoot)) {
+        providerCandidates.push({
+          ...item,
+          rootLength: providerRoot.fsPath.length
+        });
+      }
+    }
+
+    if (providerCandidates.length === 0) {
+      return providersToCheck;
+    }
+
+    providerCandidates.sort((a, b) => b.rootLength - a.rootLength);
+    return [providerCandidates[0]];
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function revealTreeItem(tree, item, options, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      try {
+        await tree.reveal(item, options);
+        return true;
+      } catch {
+        if (attempt === retries - 1) {
+          return false;
+        }
+        await delay(100);
+      }
+    }
+    return false;
+  }
+
+  async function revealFileInProvider(provider, tree, fileUri) {
+    if (!provider || !tree || !fileUri) return false;
+
+    const rootUri = provider.currentRootUri || provider.rootUri;
+    if (!rootUri || !isPathUnderRoot(fileUri, rootUri)) return false;
+
+    const relativePath = path.relative(rootUri.fsPath, fileUri.fsPath);
+    const parts = relativePath.split(path.sep).filter(Boolean);
+    const folderParts = parts.slice(0, -1);
+    let currentUri = rootUri;
+
+    provider.refresh();
+    await delay(150);
+
+    for (const part of folderParts) {
+      currentUri = vscode.Uri.joinPath(currentUri, part);
+      provider.trackExpand(currentUri);
+      const success = await revealTreeItem(
+        tree,
+        new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, path.basename(currentUri.fsPath), provider.stateKey),
+        { expand: true, focus: false, select: false },
+        5
+      );
+      if (!success) {
+        return false;
+      }
+      await delay(30);
+    }
+
+    const fileSuccessful = await revealTreeItem(
+      tree,
+      new FileNode(fileUri, vscode.TreeItemCollapsibleState.None, false, path.basename(fileUri.fsPath), provider.stateKey),
+      { expand: true, focus: false, select: true },
+      5
+    );
+
+    if (fileSuccessful) {
+      provider.setLastOpenedFile(fileUri);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Active file jump state
   const syncStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   syncStatusBarItem.command = "paulcaras.explorer2.syncWithActiveEditor";
 
   function updateSyncStatus() {
-    syncStatusBarItem.text = `$(link) Sync: ${syncWithEditorEnabled ? "On" : "Off"}`;
+    syncStatusBarItem.text = `$(link) Active File Jump: ${activeFileJumpEnabled ? "On" : "Off"}`;
     syncStatusBarItem.show();
   }
 
   updateSyncStatus();
 
   // Listen for active editor changes
-  const editorWatcher = vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (!syncWithEditorEnabled || !editor || editor.document.uri.scheme !== "file") return;
+  const editorWatcher = vscode.window.onDidChangeActiveTextEditor(async editor => {
+    if (!activeFileJumpEnabled || !editor || editor.document.uri.scheme !== "file") return;
 
-    // Auto-reveal the file by expanding parent folders
     const fileUri = editor.document.uri;
-    const activeWorkspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
-    
-    if (!activeWorkspaceFolder) return;
+    let panels = chooseProviderForFile(fileUri);
+    let revealed = false;
 
-    // Find the relative path and expand folders
-    let currentPath = activeWorkspaceFolder;
-    const fileParts = path.relative(activeWorkspaceFolder.fsPath, fileUri.fsPath).split(path.sep);
-    
-    // Remove the filename, keep only folder path
-    fileParts.pop();
-
-    // Expand each folder level
-    for (const part of fileParts) {
-      currentPath = vscode.Uri.joinPath(currentPath, part);
+    for (const panel of panels) {
+      if (!panel.provider || !panel.tree) continue;
+      const didReveal = await revealFileInProvider(panel.provider, panel.tree, fileUri);
+      if (didReveal) {
+        revealed = true;
+        if (panels.length === 1) break;
+      }
     }
 
-    // Try to reveal and select the file in both trees
-    try {
-      vscode.window.showInformationMessage(`Synced to: ${path.basename(fileUri.fsPath)}`);
-    } catch {
-      // Silent fail
+    if (!revealed && panels.length === 1) {
+      const allPanels = [
+        { provider: topProvider, tree: topTree },
+        { provider: bottomProvider, tree: bottomTree }
+      ];
+
+      for (const panel of allPanels) {
+        if (!panel.provider || !panel.tree) continue;
+        const didReveal = await revealFileInProvider(panel.provider, panel.tree, fileUri);
+        if (didReveal) {
+          revealed = true;
+          break;
+        }
+      }
+    }
+
+    if (revealed) {
+      try {
+       // vscode.window.showInformationMessage(`Active file jumped to: ${path.basename(fileUri.fsPath)}`);
+      } catch {
+        // ignore
+      }
     }
   });
 
@@ -1408,11 +1546,20 @@ function activate(context) {
       }
     }),
 
-    // Toggle sync with active editor
-    vscode.commands.registerCommand("paulcaras.explorer2.syncWithActiveEditor", () => {
-      syncWithEditorEnabled = !syncWithEditorEnabled;
-      updateSyncStatus();
-      vscode.window.showInformationMessage(`Sync with Active Editor: ${syncWithEditorEnabled ? "Enabled" : "Disabled"}`);
+    // Toggle active file jump
+    vscode.commands.registerCommand("paulcaras.explorer2.syncWithActiveEditor", async () => {
+      setActiveFileJumpEnabled(!activeFileJumpEnabled);
+      vscode.window.showInformationMessage(`Active File Jump: ${activeFileJumpEnabled ? "Enabled" : "Disabled"}`);
+
+      if (activeFileJumpEnabled && vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === "file") {
+        const currentFileUri = vscode.window.activeTextEditor.document.uri;
+        const panels = chooseProviderForFile(currentFileUri);
+        for (const panel of panels) {
+          if (!panel.provider || !panel.tree) continue;
+          await revealFileInProvider(panel.provider, panel.tree, currentFileUri);
+          if (panels.length === 1) break;
+        }
+      }
     }),
 
     // Navigate Panel I to selected folder
