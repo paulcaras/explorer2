@@ -755,11 +755,18 @@ function activate(context) {
 
     provider.refresh();
 
-    // Wait for the initial tree layout before restoring expansion and scroll position.
-    await delay(150);
-
     const expandedPaths = Array.from(provider.expandedPaths).sort((a, b) => a.length - b.length);
+    const lastFileUri = provider.getLastOpenedFileUri();
+    const lastFileParentPath = lastFileUri ? path.dirname(lastFileUri.fsPath) : null;
     for (const expandedPath of expandedPaths) {
+      // Parent folders are expanded again below while walking to the scroll anchor.
+      if (lastFileParentPath && (
+        expandedPath === lastFileParentPath ||
+        lastFileParentPath.startsWith(`${expandedPath}${path.sep}`)
+      )) {
+        continue;
+      }
+
       try {
         const folderUri = vscode.Uri.file(expandedPath);
         const stat = await safeStat(folderUri);
@@ -769,13 +776,12 @@ function activate(context) {
           expand: true,
           focus: false,
           select: false
-        }, 5);
+        }, 3, 50);
       } catch {
         // Best effort restoration.
       }
     }
 
-    const lastFileUri = provider.getLastOpenedFileUri();
     if (!lastFileUri) return;
 
     const lastFileStat = await safeStat(lastFileUri);
@@ -796,14 +802,14 @@ function activate(context) {
             expand: true,
             focus: false,
             select: false
-          }, 5);
+            }, 3, 50);
         }
 
         // Selecting the saved item makes VS Code scroll the panel to its previous location.
         await revealTreeItem(tree, new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
           focus: false,
           select: true
-        }, 5);
+        }, 3, 50);
       }
     } catch {
       // Best effort restoration.
@@ -945,7 +951,7 @@ function activate(context) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async function revealTreeItem(tree, item, options, retries = 5) {
+  async function revealTreeItem(tree, item, options, retries = 5, retryDelayMs = 100) {
     for (let attempt = 0; attempt < retries; attempt += 1) {
       try {
         await tree.reveal(item, options);
@@ -954,7 +960,7 @@ function activate(context) {
         if (attempt === retries - 1) {
           return false;
         }
-        await delay(100);
+        await delay(retryDelayMs);
       }
     }
     return false;
