@@ -756,32 +756,23 @@ function activate(context) {
     provider.refresh();
 
     const expandedPaths = Array.from(provider.expandedPaths).sort((a, b) => a.length - b.length);
-    const lastFileUri = provider.getLastOpenedFileUri();
-    const lastFileParentPath = lastFileUri ? path.dirname(lastFileUri.fsPath) : null;
     for (const expandedPath of expandedPaths) {
-      // Parent folders are expanded again below while walking to the scroll anchor.
-      if (lastFileParentPath && (
-        expandedPath === lastFileParentPath ||
-        lastFileParentPath.startsWith(`${expandedPath}${path.sep}`)
-      )) {
-        continue;
-      }
-
       try {
         const folderUri = vscode.Uri.file(expandedPath);
         const stat = await safeStat(folderUri);
         if (!stat || stat.type !== vscode.FileType.Directory) continue;
 
-        await revealTreeItem(tree, new FileNode(folderUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+        await tree.reveal(new FileNode(folderUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
           expand: true,
           focus: false,
           select: false
-        }, 3, 50);
+        });
       } catch {
         // Best effort restoration.
       }
     }
 
+    const lastFileUri = provider.getLastOpenedFileUri();
     if (!lastFileUri) return;
 
     const lastFileStat = await safeStat(lastFileUri);
@@ -798,18 +789,18 @@ function activate(context) {
         for (const part of parts) {
           currentUri = vscode.Uri.joinPath(currentUri, part);
           provider.trackExpand(currentUri);
-          await revealTreeItem(tree, new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
+          await tree.reveal(new FileNode(currentUri, vscode.TreeItemCollapsibleState.Collapsed, true, null, provider.stateKey), {
             expand: true,
             focus: false,
             select: false
-            }, 3, 50);
+          });
         }
 
         // Selecting the saved item makes VS Code scroll the panel to its previous location.
-        await revealTreeItem(tree, new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
+        await tree.reveal(new FileNode(lastFileUri, vscode.TreeItemCollapsibleState.None, false, null, provider.stateKey), {
           focus: false,
           select: true
-        }, 3, 50);
+        });
       }
     } catch {
       // Best effort restoration.
@@ -951,7 +942,7 @@ function activate(context) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async function revealTreeItem(tree, item, options, retries = 5, retryDelayMs = 100) {
+  async function revealTreeItem(tree, item, options, retries = 5) {
     for (let attempt = 0; attempt < retries; attempt += 1) {
       try {
         await tree.reveal(item, options);
@@ -960,7 +951,7 @@ function activate(context) {
         if (attempt === retries - 1) {
           return false;
         }
-        await delay(retryDelayMs);
+        await delay(100);
       }
     }
     return false;
