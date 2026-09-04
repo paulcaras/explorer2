@@ -572,7 +572,7 @@ function activate(context) {
   // Helper to get all providers
   const providers = () => [topProvider, bottomProvider].filter(Boolean);
   const ACTIVE_FILE_JUMP_KEY = "explorer2.activeFileJumpEnabled";
-  let activeFileJumpEnabled = context.workspaceState.get(ACTIVE_FILE_JUMP_KEY, false);
+  let activeFileJumpEnabled = context.workspaceState.get(ACTIVE_FILE_JUMP_KEY, true);
 
   function setActiveFileJumpEnabled(enabled) {
     activeFileJumpEnabled = enabled;
@@ -635,6 +635,12 @@ function activate(context) {
     if (!provider || !rootUri) return;
     provider.setCurrentRoot(rootUri);
     updateTreeViewTitles();
+
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeFileJumpEnabled && activeEditor?.document.uri.scheme === "file") {
+      const tree = provider === topProvider ? topTree : bottomTree;
+      await revealFileInProvider(provider, tree, activeEditor.document.uri);
+    }
   }
 
   async function openFolderForPanel(provider, panelLabel) {
@@ -945,8 +951,7 @@ function activate(context) {
 
   updateSyncStatus();
 
-  // Listen for active editor changes
-  const editorWatcher = vscode.window.onDidChangeActiveTextEditor(async editor => {
+  async function jumpToActiveEditor(editor = vscode.window.activeTextEditor) {
     if (!activeFileJumpEnabled || !editor || editor.document.uri.scheme !== "file") return;
 
     const fileUri = editor.document.uri;
@@ -985,13 +990,22 @@ function activate(context) {
         // ignore
       }
     }
-  });
+  }
+
+  const editorWatcher = vscode.window.onDidChangeActiveTextEditor(jumpToActiveEditor);
+  void jumpToActiveEditor();
 
   // Register tree-event subscriptions and workspace-required disposables
   if (topTree && bottomTree) {
     context.subscriptions.push(
       topTree.onDidChangeSelection(() => setActivePanel(TOP_PANEL_KEY)),
       bottomTree.onDidChangeSelection(() => setActivePanel(BOTTOM_PANEL_KEY)),
+      topTree.onDidChangeVisibility(event => {
+        if (event.visible) void jumpToActiveEditor();
+      }),
+      bottomTree.onDidChangeVisibility(event => {
+        if (event.visible) void jumpToActiveEditor();
+      }),
       topTree.onDidExpandElement(e => topProvider.trackExpand(e.element.resourceUri)),
       topTree.onDidCollapseElement(e => topProvider.trackCollapse(e.element.resourceUri)),
       bottomTree.onDidExpandElement(e => bottomProvider.trackExpand(e.element.resourceUri)),
@@ -1482,13 +1496,7 @@ function activate(context) {
       vscode.window.showInformationMessage(`Active File Jump: ${activeFileJumpEnabled ? "Enabled" : "Disabled"}`);
 
       if (activeFileJumpEnabled && vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === "file") {
-        const currentFileUri = vscode.window.activeTextEditor.document.uri;
-        const panels = chooseProviderForFile(currentFileUri);
-        for (const panel of panels) {
-          if (!panel.provider || !panel.tree) continue;
-          await revealFileInProvider(panel.provider, panel.tree, currentFileUri);
-          if (panels.length === 1) break;
-        }
+        await jumpToActiveEditor();
       }
     }),
 

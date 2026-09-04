@@ -4,6 +4,17 @@ Explorer 2 enhances your development workflow by providing **dual independent fi
 
 ![Explorer 2 Demo](media/Screenshot1.png)
 
+
+## Change Log
+
+## [1.2.4] - 2026-09-04
+
+### Changed
+- File and folder icons are now based current VS Code theme
+- Replaced the folder context-menu `Navigate Panel Here` actions with `Set Panel Root Here`, with the selected panel root persisted for the workspace
+
+
+
 ## Features
 
 ### Dual File Explorers
@@ -23,7 +34,7 @@ Explorer 2 enhances your development workflow by providing **dual independent fi
 ### Enhanced Navigation
 - **Show/Hide Hidden Files**: Toggle visibility of dotfiles and hidden directories
 - **Collapse/Expand All**: Quickly manage folder tree expansion states
-- **Navigate to Folder**: Right-click any folder to make it the root of that explorer
+- **Set Panel Root Here**: Set a panel's root folder from the folder context menu and persist it for the workspace
 - **Go to Parent Folder**: Navigate up to the parent directory with toolbar button
 - **Sync with Active Editor**: Automatically reveal the currently open file in the explorer
 - **State Persistence**: Automatically remembers the last viewed folder in each explorer
@@ -82,8 +93,8 @@ All commands are accessible via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift
 | `Explorer 2: Sync with Active Editor` | Reveal active file in explorer |
 | `Explorer 2: Open to Left` | Open file in left editor pane |
 | `Explorer 2: Open to Right` | Open file in right editor pane |
-| `Explorer 2: Navigate Panel I Here` | Set selected folder as root of Panel I |
-| `Explorer 2: Navigate Panel II Here` | Set selected folder as root of Panel II |
+| `Explorer 2: Set Panel I Root Here` | Set selected folder as root of Panel I and persist it for the workspace |
+| `Explorer 2: Set Panel II Root Here` | Set selected folder as root of Panel II and persist it for the workspace |
 | `Explorer 2: Go to Parent Folder` | Navigate up to the parent directory |
 
 ## Keyboard Shortcuts
