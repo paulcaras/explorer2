@@ -10,7 +10,7 @@ function setupEditorSync(context, { topProvider, bottomProvider, topTree, bottom
   syncStatusBarItem.command = "paulcaras.explorer2.syncWithActiveEditor";
 
   function updateSyncStatus() {
-    syncStatusBarItem.text = `$(link) Active File Jump: ${activeFileJumpEnabled ? "On" : "Off"}`;
+    syncStatusBarItem.text = `$(link) File Jumper: ${activeFileJumpEnabled ? "Active" : "Inactive"}`;
     syncStatusBarItem.show();
   }
 
@@ -97,9 +97,6 @@ function setupEditorSync(context, { topProvider, bottomProvider, topTree, bottom
       }
       if (!folderItem) return false;
 
-      const revealed = await revealTreeItem(tree, folderItem, { expand: true, focus: false, select: false }, 5);
-      if (!revealed) return false;
-
       parentItem = folderItem;
     }
 
@@ -118,6 +115,13 @@ function setupEditorSync(context, { topProvider, bottomProvider, topTree, bottom
     return false;
   }
 
+  function isFileAlreadyRevealed(provider, tree, fileUri) {
+    const lastOpenedFile = provider?.getLastOpenedFileUri?.();
+    if (lastOpenedFile?.fsPath === fileUri.fsPath) return true;
+
+    return tree?.selection?.some((item) => item?.resourceUri?.fsPath === fileUri.fsPath) || false;
+  }
+
   async function jumpToActiveEditor(editor = vscode.window.activeTextEditor) {
     if (!activeFileJumpEnabled || !editor || editor.document.uri.scheme !== "file") return;
 
@@ -128,6 +132,7 @@ function setupEditorSync(context, { topProvider, bottomProvider, topTree, bottom
 
     const targetPanel = panels[0];
     if (targetPanel?.provider && targetPanel?.tree) {
+      if (isFileAlreadyRevealed(targetPanel.provider, targetPanel.tree, fileUri)) return;
       await revealFileInProvider(targetPanel.provider, targetPanel.tree, fileUri);
     }
   }
@@ -139,8 +144,11 @@ function setupEditorSync(context, { topProvider, bottomProvider, topTree, bottom
     vscode.window.onDidChangeActiveTextEditor(jumpToActiveEditor),
     vscode.commands.registerCommand("paulcaras.explorer2.syncWithActiveEditor", async () => {
       setActiveFileJumpEnabled(!activeFileJumpEnabled);
+      const noPanelRoots = !getPanelBoundary(topProvider) && !getPanelBoundary(bottomProvider);
       vscode.window.showInformationMessage(
-        `Active File Jump: ${activeFileJumpEnabled ? "Enabled" : "Disabled"}`
+        `File Jumper: ${activeFileJumpEnabled ? "Active" : "Inactive"}${
+          noPanelRoots ? ". No root folder is set for Panel I or Panel II." : ""
+        }`
       );
 
       if (

@@ -347,8 +347,9 @@ function activate(context) {
   });
 
   if (topProvider && bottomProvider) {
-    void restoreProviderTreeState(topProvider);
-    void restoreProviderTreeState(bottomProvider);
+    void Promise.all([restoreProviderTreeState(topProvider), restoreProviderTreeState(bottomProvider)]).then(
+      () => jumpToActiveEditor()
+    );
     updateTreeViewTitles();
   }
 }
