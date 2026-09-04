@@ -32,3 +32,4 @@ pnpm-debug.log*
 
 /build
 .eslintcache
+extension2.js

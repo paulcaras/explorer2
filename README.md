@@ -7,6 +7,12 @@ Explorer 2 enhances your development workflow by providing **dual independent fi
 
 ## Change Log
 
+## [2.0.0] - 2026-09-04
+
+### Changed
+- Reorganized the entire extension source for improved structure and maintainability
+- Active File Jump is now working: opening a file in the editor automatically reveals its location in the appropriate file tree
+
 ## [1.2.4] - 2026-09-04
 
 ### Changed
@@ -36,7 +42,7 @@ Explorer 2 enhances your development workflow by providing **dual independent fi
 - **Collapse/Expand All**: Quickly manage folder tree expansion states
 - **Set Panel Root Here**: Set a panel's root folder from the folder context menu and persist it for the workspace
 - **Go to Parent Folder**: Navigate up to the parent directory with toolbar button
-- **Sync with Active Editor**: Automatically reveal the currently open file in the explorer
+- **Active File Jump**: Automatically reveal the currently open editor file in the appropriate file tree
 - **State Persistence**: Automatically remembers the last viewed folder in each explorer
 - **Smart Icons**: Context-aware file icons based on file type and extension
 - **Sorted Display**: Files organized alphabetically with folders first
@@ -90,7 +96,7 @@ All commands are accessible via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift
 | `Explorer 2: Copy Relative Path` | Copy workspace-relative path to clipboard |
 | `Explorer 2: Collapse All` | Collapse all expanded folders |
 | `Explorer 2: Expand All` | Expand all folders |
-| `Explorer 2: Sync with Active Editor` | Reveal active file in explorer |
+| `Explorer 2: Toggle Active File Jump` | Toggle revealing the active editor file in the appropriate file tree |
 | `Explorer 2: Open to Left` | Open file in left editor pane |
 | `Explorer 2: Open to Right` | Open file in right editor pane |
 | `Explorer 2: Set Panel I Root Here` | Set selected folder as root of Panel I and persist it for the workspace |

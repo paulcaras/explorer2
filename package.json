@@ -3,7 +3,7 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "1.2.5",
+  "version": "2.0.0",
   "icon": "logo.png",
   "license": "MIT",
   "author": "Paul Caras",
