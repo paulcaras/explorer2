@@ -42,7 +42,7 @@ Explorer 2 enhances your development workflow by providing **dual independent fi
 - **Collapse/Expand All**: Quickly manage folder tree expansion states
 - **Set Panel Root Here**: Set a panel's root folder from the folder context menu and persist it for the workspace
 - **Go to Parent Folder**: Navigate up to the parent directory with toolbar button
-- **Active File Jump**: Automatically reveal the currently open editor file in the appropriate file tree
+- **Active File Jump**: Automatically reveal the currently open editor file in the appropriate file tree (enabled by default)
 - **State Persistence**: Automatically remembers the last viewed folder in each explorer
 - **Smart Icons**: Context-aware file icons based on file type and extension
 - **Sorted Display**: Files organized alphabetically with folders first

@@ -71,7 +71,14 @@ function activate(context) {
 
   updateTreeViewTitles();
 
-  if (!workspaceFolder && !topProvider.currentRootUri && !bottomProvider.currentRootUri) {
+  let hasShownNoWorkspaceWarning = false;
+
+  function showNoWorkspaceWarning() {
+    if (hasShownNoWorkspaceWarning || workspaceFolder || topProvider.currentRootUri || bottomProvider.currentRootUri) {
+      return;
+    }
+
+    hasShownNoWorkspaceWarning = true;
     vscode.window.showWarningMessage(
       "Explorer 2 has no workspace folder. Use Open Folder in each panel to start."
     );
@@ -165,7 +172,13 @@ function activate(context) {
     const target = selected?.[0];
     if (!target) return false;
 
-    await setPanelRoot(provider, target);
+    const shouldSetBoundary = !provider.rootUri && !provider.boundaryRootUri && !provider.currentRootUri;
+    if (shouldSetBoundary) {
+      provider.setBoundaryRoot(target);
+      updateTreeViewTitles();
+    } else {
+      await setPanelRoot(provider, target);
+    }
     vscode.window.showInformationMessage(`${panelLabel}: ${path.basename(target.fsPath)}`);
     return true;
   }
@@ -295,10 +308,16 @@ function activate(context) {
       topTree.onDidChangeSelection(() => setActivePanel(TOP_PANEL_KEY)),
       bottomTree.onDidChangeSelection(() => setActivePanel(BOTTOM_PANEL_KEY)),
       topTree.onDidChangeVisibility((event) => {
-        if (event.visible) void jumpToActiveEditor();
+        if (event.visible) {
+          showNoWorkspaceWarning();
+          void jumpToActiveEditor();
+        }
       }),
       bottomTree.onDidChangeVisibility((event) => {
-        if (event.visible) void jumpToActiveEditor();
+        if (event.visible) {
+          showNoWorkspaceWarning();
+          void jumpToActiveEditor();
+        }
       }),
       topTree.onDidExpandElement((e) => topProvider.trackExpand(e.element.resourceUri)),
       topTree.onDidCollapseElement((e) => topProvider.trackCollapse(e.element.resourceUri)),

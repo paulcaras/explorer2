@@ -3,7 +3,7 @@
   "displayName": "Explorer 2",
   "publisher": "paulcaras",
   "description": "Dual independent file explorers for navigating and managing files across different directories simultaneously",
-  "version": "2.0.2",
+  "version": "2.0.8",
   "icon": "logo.png",
   "license": "MIT",
   "author": "Paul Caras",
@@ -26,9 +26,6 @@
   "engines": {
     "vscode": "^1.108.1"
   },
-  "activationEvents": [
-    "onStartupFinished"
-  ],
   "categories": [
     "Other"
   ],
